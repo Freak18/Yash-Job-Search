@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Job Scraper Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* Modern Reset & CSS variables */
+        :root {
+            --bg-color: #141416;
+            --panel-bg: rgba(28, 28, 31, 0.85);
+            --border-color: rgba(201, 169, 110, 0.12);
+            --text-color: #eceae6;
+            --text-muted: #9b9690;
+            --primary: #c9a96e;
+            --primary-hover: #d4b87e;
+            --accent: #8b9e8b;
+            --success: #7d9b76;
+            --danger: #c45c5c;
+            --warning: #c9a04a;
+            --font-serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+            --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
+            --panel-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+            --transition: all 0.25s ease;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image:
+                radial-gradient(ellipse at 20% 0%, rgba(201, 169, 110, 0.06) 0%, transparent 55%),
+                radial-gradient(ellipse at 80% 100%, rgba(139, 158, 139, 0.05) 0%, transparent 55%);
+            background-attachment: fixed;
+            color: var(--text-color);
+            font-family: var(--font-sans);
+            font-weight: 400;
+            letter-spacing: 0.01em;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        header {
+            padding: 2rem 1.5rem 1rem 1.5rem;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title h1 {
+            font-family: var(--font-serif);
+            font-size: 2.1rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: var(--text-color);
+            margin-bottom: 0.25rem;
+        }
+
+        .header-title p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            font-weight: 400;
+        }
+
+        .connection-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(125, 155, 118, 0.1);
+            border: 1px solid rgba(125, 155, 118, 0.22);
+            color: var(--success);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .sheet-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(201, 169, 110, 0.08);
+            border: 1px solid rgba(201, 169, 110, 0.25);
+            color: var(--primary);
+            padding: 0.5rem 1.2rem;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            transition: var(--transition);
+        }
+
+        .sheet-badge:hover {
+            background: rgba(201, 169, 110, 0.14);
+            border-color: rgba(201, 169, 110, 0.4);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .pulse-dot {
+            width: 7px;
+            height: 7px;
+            background-color: var(--success);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 0 0 rgba(125, 155, 118, 0.5);
+            animation: pulse 2.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(125, 155, 118, 0.5);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 5px rgba(125, 155, 118, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(125, 155, 118, 0);
+            }
+        }
+
+        main {
+            flex: 1;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1rem 1.5rem 2rem 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (min-width: 1024px) {
+            main {
+                grid-template-columns: 380px 1fr;
+            }
+        }
+
+        /* Card Panels */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            box-shadow: var(--panel-shadow);
+            transition: var(--transition);
+        }
+
+        .panel:hover {
+            border-color: rgba(201, 169, 110, 0.2);
+        }
+
+        .panel-title {
+            font-family: var(--font-serif);
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+            color: var(--text-color);
+            letter-spacing: 0.02em;
+        }
+
+        /* Form Controls */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .input-number-wrapper {
+            position: relative;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            background: rgba(20, 20, 22, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            color: var(--text-color);
+            font-family: var(--font-sans);
+            font-size: 0.95rem;
+            transition: var(--transition);
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: rgba(201, 169, 110, 0.45);
+            box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.08);
+        }
+
+        .range-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 4px;
+            background: rgba(20, 20, 22, 0.9);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: 2px solid var(--bg-color);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: var(--primary-hover);
+        }
+
+        .range-value {
+            font-weight: 500;
+            font-family: var(--font-mono);
+            min-width: 2.5rem;
+            text-align: right;
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            width: 100%;
+            min-height: 48px;
+            background: var(--primary);
+            border: 1px solid rgba(201, 169, 110, 0.3);
+            border-radius: 6px;
+            color: #1a1814;
+            padding: 0.85rem 1.5rem;
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary .btn-label {
+            min-width: 8.75rem;
+            text-align: center;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-hover);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: scale(0.99);
+        }
+
+        .btn-primary.btn-stop {
+            background: transparent;
+            border-color: rgba(196, 92, 92, 0.45);
+            color: var(--danger);
+        }
+
+        .btn-primary.btn-stop:hover:not(:disabled) {
+            background: rgba(196, 92, 92, 0.1);
+        }
+
+        .btn-primary:disabled {
+            background: rgba(155, 150, 144, 0.15);
+            border-color: var(--border-color);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        /* Metrics grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .metric-card {
+            background: rgba(20, 20, 22, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .metric-card:hover {
+            border-color: rgba(201, 169, 110, 0.18);
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-value {
+            font-size: 1.65rem;
+            font-weight: 500;
+            font-family: var(--font-mono);
+            color: var(--text-color);
+        }
+
+        .metric-value.added { color: var(--success); }
+        .metric-value.duplicates { color: var(--warning); }
+        .metric-value.skipped { color: var(--text-muted); }
+
+        /* Resume Editor Section */
+        .resume-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .resume-toggle {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        .resume-toggle:hover {
+            color: var(--text-color);
+        }
+
+        .resume-toggle-icon {
+            transition: transform 0.3s;
+        }
+
+        .resume-toggle.active .resume-toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .resume-content {
+            display: none;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .resume-content.show {
+            display: flex;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            background: rgba(20, 20, 22, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.75rem;
+            color: var(--text-color);
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            resize: vertical;
+            line-height: 1.5;
+            transition: var(--transition);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: rgba(201, 169, 110, 0.45);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            font-size: 0.82rem;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-secondary:hover {
+            border-color: rgba(201, 169, 110, 0.3);
+            color: var(--text-color);
+        }
+
+        /* Right Column layout */
+        .results-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Progress Card */
+        .progress-bar-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(20, 20, 22, 0.9);
+            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--primary);
+            border-radius: 2px;
+            transition: width 0.4s ease;
+        }
+
+        .progress-status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .progress-text {
+            color: var(--text-muted);
+        }
+
+        .progress-percent {
+            font-weight: 600;
+            font-family: var(--font-mono);
+            color: var(--primary);
+        }
+
+        /* Terminal Console */
+        .terminal-panel {
+            background: #0e0e10;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: #8b9e8b;
+            padding: 1.25rem;
+            height: 180px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .terminal-line {
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+
+        .terminal-line.success { color: var(--success); }
+        .terminal-line.error { color: var(--danger); }
+        .terminal-line.warning { color: var(--warning); }
+        .terminal-line.info { color: var(--text-muted); }
+
+        /* Tables and Job Feed */
+        .table-wrapper {
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: rgba(20, 20, 22, 0.5);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: rgba(20, 20, 22, 0.8);
+            color: var(--text-muted);
+            font-weight: 500;
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr {
+            transition: var(--transition);
+        }
+
+        tr:hover td {
+            background: rgba(201, 169, 110, 0.03);
+        }
+
+        .job-title-cell {
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .job-company-cell {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .score-badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .score-badge.high {
+            background: rgba(125, 155, 118, 0.12);
+            color: var(--success);
+            border: 1px solid rgba(125, 155, 118, 0.22);
+        }
+
+        .score-badge.medium {
+            background: rgba(201, 160, 74, 0.12);
+            color: var(--warning);
+            border: 1px solid rgba(201, 160, 74, 0.22);
+        }
+
+        .score-badge.low {
+            background: rgba(196, 92, 92, 0.12);
+            color: var(--danger);
+            border: 1px solid rgba(196, 92, 92, 0.22);
+        }
+
+        .score-badge.none {
+            background: rgba(155, 150, 144, 0.1);
+            color: var(--text-muted);
+            border: 1px solid rgba(155, 150, 144, 0.18);
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+        }
+
+        .status-pill.added {
+            background: rgba(125, 155, 118, 0.12);
+            color: var(--success);
+        }
+
+        .status-pill.duplicate {
+            background: rgba(201, 160, 74, 0.12);
+            color: var(--warning);
+        }
+
+        .status-pill.skipped {
+            background: rgba(155, 150, 144, 0.08);
+            color: var(--text-muted);
+        }
+
+        .job-link-icon {
+            color: var(--primary);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .job-link-icon:hover {
+            color: var(--primary-hover);
+        }
+
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: auto;
+        }
+
+        /* Notifications toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #1c1c1f;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 1rem 1.5rem;
+            border-radius: 6px;
+            box-shadow: var(--panel-shadow);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transform: translateY(150%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-title">
+            <h1>Job Scraping Automation</h1>
+            <p>Scrape, evaluate, and feed jobs matching your resume straight into Google Sheets</p>
+        </div>
+        <div class="header-actions">
+            <a href="https://docs.google.com/spreadsheets/d/1ANIKjVLE2J7sIZl64Vfe9nyHfFztFe5KyIrt5glonJQ/edit?gid=968216500#gid=968216500" target="_blank" style="text-decoration: none;">
+                <div class="sheet-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    Job Sheet
+                </div>
+            </a>
+            <div class="connection-badge">
+                <span class="pulse-dot"></span>
+                <span id="connection-status">Ready</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Left configuration sidebar -->
+        <section class="panel" aria-label="Controls and Settings">
+            <h2 class="panel-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
+                Control Panel
+            </h2>
+
+            <div class="form-group">
+                <label for="job-count">Number of Jobs to Scrape</label>
+                <input type="number" id="job-count" min="1" max="100" value="10">
+            </div>
+
+            <div class="form-group">
+                <label for="min-score">Minimum Score Cutoff</label>
+                <div class="range-wrapper">
+                    <input type="range" id="min-score" min="0" max="100" value="80">
+                    <span id="min-score-val" class="range-value">80</span>
+                </div>
+            </div>
+
+            <button id="start-btn" class="btn-primary">
+                <svg id="start-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                <span id="start-btn-label" class="btn-label">Run Scraper</span>
+            </button>
+
+            <!-- Metrics Card -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Total Found</div>
+                    <div id="metric-total" class="metric-value">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Added</div>
+                    <div id="metric-added" class="metric-value added">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Duplicates</div>
+                    <div id="metric-duplicates" class="metric-value duplicates">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Skipped</div>
+                    <div id="metric-skipped" class="metric-value skipped">0</div>
+                </div>
+            </div>
+
+            <!-- Resume collapse editor -->
+            <div class="resume-section">
+                <div id="resume-toggle-btn" class="resume-toggle">
+                    <span>✏️ Edit Matching Resume</span>
+                    <svg class="resume-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div id="resume-editor-container" class="resume-content">
+                    <textarea id="resume-text" placeholder="Loading resume..."></textarea>
+                    <button id="save-resume-btn" class="btn-secondary">Save Changes</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right progress & outputs area -->
+        <section class="results-container" aria-label="Results and Terminal">
+            <!-- Progress Status -->
+            <article class="panel" style="gap: 0.75rem;">
+                <div class="progress-status-row">
+                    <span id="status-message" class="progress-text">System Idle. Press "Run Scraper" to start.</span>
+                    <span id="status-percent" class="progress-percent">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div id="progress-fill" class="progress-bar-fill"></div>
+                </div>
+            </article>
+
+            <!-- Logs / Terminal Output -->
+            <article class="panel">
+                <h2 class="panel-title" style="border: none; padding-bottom: 0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    Console Logs
+                </h2>
+                <div id="terminal" class="terminal-panel">
+                    <div class="terminal-line info">[SYSTEM] Console initialized. Ready to receive output.</div>
+                </div>
+            </article>
+
+            <!-- Job Feed / Table -->
+            <article class="panel">
+                <h2 class="panel-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    Scraped & Evaluated Jobs
+                </h2>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Job details</th>
+                                <th>Match Score</th>
+                                <th>Action Taken</th>
+                                <th>Link</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobs-table-body">
+                            <tr id="empty-row">
+                                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                    No jobs processed in this run yet.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">
+        <span id="toast-message">Notification</span>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Job Automation Tool. Powered by Apify & Google Sheets.</p>
+    </footer>
+
+    <!-- Scripting logic -->
+    <script>
+        // DOM Elements
+        const jobCountInput = document.getElementById('job-count');
+        const minScoreSlider = document.getElementById('min-score');
+        const minScoreVal = document.getElementById('min-score-val');
+        const startBtn = document.getElementById('start-btn');
+        const startBtnLabel = document.getElementById('start-btn-label');
+        const startBtnIcon = document.getElementById('start-btn-icon');
+        const connectionStatus = document.getElementById('connection-status');
+        const connectionBadge = document.querySelector('.connection-badge');
+        
+        const metricTotal = document.getElementById('metric-total');
+        const metricAdded = document.getElementById('metric-added');
+        const metricDuplicates = document.getElementById('metric-duplicates');
+        const metricSkipped = document.getElementById('metric-skipped');
+
+        const resumeToggleBtn = document.getElementById('resume-toggle-btn');
+        const resumeEditorContainer = document.getElementById('resume-editor-container');
+        const resumeTextArea = document.getElementById('resume-text');
+        const saveResumeBtn = document.getElementById('save-resume-btn');
+
+        const statusMessage = document.getElementById('status-message');
+        const statusPercent = document.getElementById('status-percent');
+        const progressFill = document.getElementById('progress-fill');
+        const terminal = document.getElementById('terminal');
+        const jobsTableBody = document.getElementById('jobs-table-body');
+        const emptyRow = document.getElementById('empty-row');
+        const toast = document.getElementById('toast');
+
+        // State variables
+        let isScraping = false;
+        let eventSource = null;
+        let totalJobsToProcess = 0;
+
+        // Slider value display update
+        minScoreSlider.addEventListener('input', (e) => {
+            minScoreVal.textContent = e.target.value;
+        });
+
+        // Resume editor toggle collapsible
+        resumeToggleBtn.addEventListener('click', () => {
+            resumeToggleBtn.classList.toggle('active');
+            resumeEditorContainer.classList.toggle('show');
+        });
+
+        // Show toast notifications
+        function showToast(message, type = 'success') {
+            toast.className = `toast show ${type}`;
+            document.getElementById('toast-message').textContent = message;
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 4000);
+        }
+
+        // Fetch resume on load
+        async function fetchResume() {
+            try {
+                const res = await fetch('/api/resume');
+                const data = await res.json();
+                if (data.success) {
+                    resumeTextArea.value = data.content;
+                } else {
+                    console.error('Failed to load resume:', data.message);
+                }
+            } catch (err) {
+                console.error('Error fetching resume:', err);
+            }
+        }
+
+        // Save resume edits
+        saveResumeBtn.addEventListener('click', async () => {
+            saveResumeBtn.disabled = true;
+            saveResumeBtn.textContent = 'Saving...';
+            try {
+                const res = await fetch('/api/resume', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: resumeTextArea.value })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Resume saved successfully!', 'success');
+                } else {
+                    showToast('Failed to save resume: ' + data.message, 'error');
+                }
+            } catch (err) {
+                showToast('Network error saving resume', 'error');
+            } finally {
+                saveResumeBtn.disabled = false;
+                saveResumeBtn.textContent = 'Save Changes';
+            }
+        });
+
+        // Appending logs to console
+        function appendTerminalLine(text, styleClass = '') {
+            const line = document.createElement('div');
+            line.className = `terminal-line ${styleClass}`;
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Reset metrics UI
+        function resetRunUI() {
+            metricTotal.textContent = '0';
+            metricAdded.textContent = '0';
+            metricDuplicates.textContent = '0';
+            metricSkipped.textContent = '0';
+            progressFill.style.width = '0%';
+            statusPercent.textContent = '0%';
+            statusMessage.textContent = 'Starting job runner...';
+            jobsTableBody.innerHTML = '';
+            appendTerminalLine('Run initiated. Connecting server...', 'info');
+        }
+
+        // Color coding score numbers
+        function getScoreClass(score) {
+            if (score === null || score === undefined || score === 0) return 'none';
+            if (score >= 85) return 'high';
+            if (score >= 70) return 'medium';
+            return 'low';
+        }
+
+        // Action style helper
+        function getActionClass(action) {
+            if (action.includes('Added')) return 'added';
+            if (action.includes('Duplicate')) return 'duplicate';
+            return 'skipped';
+        }
+
+        // Start button listener
+        startBtn.addEventListener('click', () => {
+            if (isScraping) {
+                // If it is running, let's stop it
+                cleanupScraping();
+                appendTerminalLine('Scraping run aborted by user.', 'error');
+                return;
+            }
+
+            const count = jobCountInput.value;
+            const minScore = minScoreSlider.value;
+
+            // UI Adjustments
+            isScraping = true;
+            startBtnLabel.textContent = 'Stop Scraper';
+            startBtn.classList.add('btn-stop');
+            startBtnIcon.innerHTML = '<rect x="6" y="6" width="12" height="12" rx="1"></rect>';
+            connectionStatus.textContent = 'Running';
+            connectionBadge.style.background = 'rgba(201, 169, 110, 0.1)';
+            connectionBadge.style.borderColor = 'rgba(201, 169, 110, 0.22)';
+            connectionBadge.style.color = 'var(--primary)';
+            document.querySelector('.pulse-dot').style.backgroundColor = 'var(--primary)';
+
+            resetRunUI();
+
+            // Establish Server-Sent Events source connection
+            eventSource = new EventSource(`/api/run?count=${count}&min_score=${minScore}`);
+
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'log') {
+                    let style = '';
+                    if (data.status === 'error') style = 'error';
+                    appendTerminalLine(data.message, style);
+                } 
+                else if (data.type === 'start_processing') {
+                    totalJobsToProcess = data.total;
+                    metricTotal.textContent = totalJobsToProcess;
+                    statusMessage.textContent = data.message;
+                    appendTerminalLine(`Processing data items feed. Count: ${totalJobsToProcess}`, 'info');
+                } 
+                else if (data.type === 'job_processed') {
+                    // Update table
+                    if (emptyRow) emptyRow.style.display = 'none';
+
+                    const row = document.createElement('tr');
+                    
+                    const scoreVal = data.score !== null ? data.score : 'N/A';
+                    const scoreClass = getScoreClass(data.score);
+                    const actionClass = getActionClass(data.action);
+
+                    row.innerHTML = `
+                        <td>
+                            <div class="job-title-cell">${data.title || 'Unknown Title'}</div>
+                            <div class="job-company-cell">${data.company || 'Unknown Company'}</div>
+                        </td>
+                        <td>
+                            <span class="score-badge ${scoreClass}">${scoreVal}</span>
+                        </td>
+                        <td>
+                            <span class="status-pill ${actionClass}">${data.action}</span>
+                        </td>
+                        <td>
+                            ${data.link ? `<a href="${data.link}" target="_blank" class="job-link-icon" aria-label="Visit job post">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            </a>` : '-'}
+                        </td>
+                    `;
+                    jobsTableBody.appendChild(row);
+
+                    // Update Metrics dynamically
+                    if (data.action.includes('Added')) {
+                        metricAdded.textContent = parseInt(metricAdded.textContent) + 1;
+                    } else if (data.action.includes('Duplicate')) {
+                        metricDuplicates.textContent = parseInt(metricDuplicates.textContent) + 1;
+                    } else {
+                        metricSkipped.textContent = parseInt(metricSkipped.textContent) + 1;
+                    }
+
+                    // Calculate Progress
+                    if (data.index && totalJobsToProcess > 0) {
+                        const pct = Math.round((data.index / totalJobsToProcess) * 100);
+                        progressFill.style.width = `${pct}%`;
+                        statusPercent.textContent = `${pct}%`;
+                        statusMessage.textContent = `Processing job ${data.index} of ${totalJobsToProcess}...`;
+                    }
+                } 
+                else if (data.type === 'completed') {
+                    progressFill.style.width = '100%';
+                    statusPercent.textContent = '100%';
+                    statusMessage.textContent = 'Finished processing all jobs successfully!';
+                    appendTerminalLine('SUCCESS: Scraper run finished.', 'success');
+                    
+                    showToast(`Scraper finished! Added ${data.added} jobs.`, 'success');
+                    cleanupScraping();
+                }
+            };
+
+            eventSource.onerror = (err) => {
+                console.error('SSE connection error:', err);
+                appendTerminalLine('Server disconnected or error occurred.', 'error');
+                showToast('Error connecting to scraping server.', 'error');
+                cleanupScraping();
+            };
+        });
+
+        function cleanupScraping() {
+            isScraping = false;
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            // Restore Start Button state
+            startBtnLabel.textContent = 'Run Scraper';
+            startBtn.classList.remove('btn-stop');
+            startBtnIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+            connectionStatus.textContent = 'Ready';
+            connectionBadge.style.background = 'rgba(125, 155, 118, 0.1)';
+            connectionBadge.style.borderColor = 'rgba(125, 155, 118, 0.22)';
+            connectionBadge.style.color = 'var(--success)';
+            document.querySelector('.pulse-dot').style.backgroundColor = 'var(--success)';
+        }
+
+        // Initialize resume input fields
+        fetchResume();
+    </script>
+</body>
+</html>
