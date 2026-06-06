@@ -7,7 +7,11 @@ from flask import Flask, Response, render_template, request
 from main import run_job_scraper
 from paths import BASE_DIR, read_resume, write_resume
 
-app = Flask(__name__, template_folder=str(BASE_DIR / "templates"))
+app = Flask(
+    __name__,
+    template_folder=str(BASE_DIR / "templates"),
+    static_folder=str(BASE_DIR / "static"),
+)
 
 
 @app.route("/")

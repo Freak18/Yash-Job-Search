@@ -1,10 +1,47 @@
 from datetime import datetime
+from urllib.parse import urlparse
 
 from apify_client import ApifyClient
 
 from config import APIFY_TOKEN, SHEET_NAME
 from scorer import get_score
 from sheets import get_gspread_client
+
+JOB_LINK_COLUMN = 3
+
+
+def normalize_job_link(link: str) -> str:
+    link = (link or "").strip()
+    if not link:
+        return ""
+
+    parsed = urlparse(link)
+    if not parsed.scheme or not parsed.netloc:
+        return link.lower().rstrip("/")
+
+    netloc = parsed.netloc.lower()
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
+
+    path = parsed.path.rstrip("/")
+    return f"{parsed.scheme.lower()}://{netloc}{path}"
+
+
+def load_existing_job_links(worksheet) -> set:
+    links = set()
+    try:
+        for raw_link in worksheet.col_values(JOB_LINK_COLUMN)[1:]:
+            normalized = normalize_job_link(raw_link)
+            if normalized:
+                links.add(normalized)
+    except Exception:
+        pass
+    return links
+
+
+def is_duplicate_job(link: str, existing_links: set) -> bool:
+    normalized = normalize_job_link(link)
+    return bool(normalized) and normalized in existing_links
 
 
 def run_job_scraper(count=10, min_score=80, status_callback=None):
@@ -44,13 +81,13 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
         emit("log", error_msg, status="error")
         return {"error": error_msg}
 
-    existing_links = set()
     try:
-        existing_links = set(worksheet.col_values(3))
+        existing_links = load_existing_job_links(worksheet)
     except Exception as e:
+        existing_links = set()
         emit("log", f"Warning: Failed to retrieve existing links from sheet: {str(e)}")
 
-    emit("log", f"Loaded {len(existing_links)} existing jobs")
+    emit("log", f"Loaded {len(existing_links)} existing job links for duplicate check")
 
     emit("log", "Starting LinkedIn Scraper...")
     try:
@@ -110,7 +147,9 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
                 )
                 continue
 
-            if link in existing_links:
+            normalized_link = normalize_job_link(link)
+
+            if is_duplicate_job(link, existing_links):
                 duplicate_jobs += 1
                 emit(
                     "job_processed",
@@ -141,6 +180,20 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
                 )
                 continue
 
+            if is_duplicate_job(link, existing_links):
+                duplicate_jobs += 1
+                emit(
+                    "job_processed",
+                    f"Duplicate (skipped): {title} at {company}",
+                    title=title,
+                    company=company,
+                    score=score,
+                    action="Duplicate (Skipped)",
+                    link=link,
+                    index=index + 1,
+                )
+                continue
+
             worksheet.append_row([
                 title,
                 company,
@@ -150,7 +203,7 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
                 date_added,
             ])
 
-            existing_links.add(link)
+            existing_links.add(normalized_link)
             jobs_added += 1
             emit(
                 "job_processed",
