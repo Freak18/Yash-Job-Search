@@ -37,6 +37,11 @@
             padding: 0;
         }
 
+        html {
+            width: 100%;
+            overflow-x: hidden;
+        }
+
         body {
             background-color: var(--bg-color);
             background-image:
@@ -59,6 +64,7 @@
             padding: 2rem 1.5rem 1rem 1.5rem;
             max-width: 1400px;
             width: 100%;
+            min-width: 0;
             margin: 0 auto;
             display: flex;
             justify-content: space-between;
@@ -163,16 +169,24 @@
             flex: 1;
             max-width: 1400px;
             width: 100%;
+            min-width: 0;
             margin: 0 auto;
             padding: 1rem 1.5rem 2rem 1.5rem;
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
             gap: 1.5rem;
+        }
+
+        main > *,
+        .results-container,
+        .panel {
+            min-width: 0;
+            max-width: 100%;
         }
 
         @media (min-width: 1024px) {
             main {
-                grid-template-columns: 380px 1fr;
+                grid-template-columns: 380px minmax(0, 1fr);
             }
         }
 
@@ -245,6 +259,8 @@
             display: flex;
             align-items: center;
             gap: 1rem;
+            min-width: 0;
+            width: 100%;
         }
 
         input[type="range"] {
@@ -524,6 +540,8 @@
         .terminal-line {
             line-height: 1.4;
             white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .terminal-line.success { color: var(--success); }
@@ -533,20 +551,24 @@
 
         /* Tables and Job Feed */
         .table-wrapper {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             background: rgba(20, 20, 22, 0.5);
-            max-width: 100%;
         }
 
         table {
             width: 100%;
-            min-width: 520px;
             border-collapse: collapse;
             text-align: left;
             font-size: 0.9rem;
+            table-layout: fixed;
+        }
+
+        .cell-label {
+            display: none;
         }
 
         th {
@@ -564,6 +586,8 @@
             padding: 1rem;
             border-bottom: 1px solid var(--border-color);
             color: var(--text-color);
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         tr:last-child td {
@@ -725,8 +749,13 @@
 
         @media (max-width: 768px) {
             main {
-                padding: 0.75rem 1rem 1.5rem;
+                padding: 0.75rem 0.85rem 1.5rem;
                 gap: 1rem;
+            }
+
+            header {
+                padding-left: 0.85rem;
+                padding-right: 0.85rem;
             }
 
             .panel {
@@ -767,23 +796,84 @@
                 align-self: flex-end;
             }
 
-            th,
-            td {
-                padding: 0.7rem 0.65rem;
+            .btn-primary .btn-label {
+                min-width: 0;
             }
 
-            th {
+            .table-wrapper {
+                border: none;
+                background: transparent;
+                overflow: visible;
+            }
+
+            table,
+            thead,
+            tbody,
+            #jobs-table-body {
+                display: block;
+                width: 100%;
+            }
+
+            thead {
+                display: none;
+            }
+
+            #jobs-table-body tr {
+                display: block;
+                margin-bottom: 0.75rem;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                background: rgba(20, 20, 22, 0.6);
+                padding: 0.85rem;
+            }
+
+            #jobs-table-body tr:hover td {
+                background: transparent;
+            }
+
+            #jobs-table-body td {
+                display: block;
+                width: 100%;
+                padding: 0;
+                border-bottom: none;
+            }
+
+            #jobs-table-body td.job-cell {
+                padding-bottom: 0.75rem;
+                margin-bottom: 0.65rem;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            #jobs-table-body td.meta-cell {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem;
+                padding: 0.35rem 0;
+            }
+
+            #jobs-table-body .cell-label {
+                display: inline-block;
                 font-size: 0.68rem;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: var(--text-muted);
+                flex-shrink: 0;
             }
 
-            table {
-                font-size: 0.82rem;
-                min-width: 480px;
+            #empty-row td {
+                display: block;
+                text-align: center;
+                padding: 2rem 1rem;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                color: var(--text-muted);
             }
 
             .status-pill {
                 font-size: 0.68rem;
                 padding: 0.3rem 0.5rem;
+                text-align: right;
             }
 
             .score-badge {
@@ -791,13 +881,13 @@
             }
 
             .toast {
-                left: 1rem;
-                right: 1rem;
+                left: 0.85rem;
+                right: 0.85rem;
                 bottom: 1rem;
             }
 
             footer {
-                padding: 1rem;
+                padding: 1rem 0.85rem;
                 font-size: 0.75rem;
             }
         }
@@ -807,19 +897,24 @@
                 font-size: 1.45rem;
             }
 
+            .header-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .header-actions a,
+            .connection-badge {
+                width: 100%;
+            }
+
             .sheet-badge,
             .connection-badge {
-                padding: 0.45rem 0.75rem;
+                justify-content: center;
+                padding: 0.5rem 0.75rem;
                 font-size: 0.72rem;
             }
 
-            .btn-primary .btn-label {
-                min-width: 7.5rem;
-            }
-
             .resume-toggle span {
-                flex: 1;
-                min-width: 0;
                 padding-right: 0.5rem;
                 line-height: 1.4;
             }
@@ -959,9 +1054,7 @@
                         </thead>
                         <tbody id="jobs-table-body">
                             <tr id="empty-row">
-                                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                                    No jobs processed in this run yet.
-                                </td>
+                                <td colspan="4">No jobs processed in this run yet.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1163,17 +1256,20 @@
                     const actionClass = getActionClass(data.action);
 
                     row.innerHTML = `
-                        <td>
+                        <td class="job-cell">
                             <div class="job-title-cell">${data.title || 'Unknown Title'}</div>
                             <div class="job-company-cell">${data.company || 'Unknown Company'}</div>
                         </td>
-                        <td>
+                        <td class="meta-cell">
+                            <span class="cell-label">Score</span>
                             <span class="score-badge ${scoreClass}">${scoreVal}</span>
                         </td>
-                        <td>
+                        <td class="meta-cell">
+                            <span class="cell-label">Action</span>
                             <span class="status-pill ${actionClass}">${data.action}</span>
                         </td>
-                        <td>
+                        <td class="meta-cell">
+                            <span class="cell-label">Link</span>
                             ${data.link ? `<a href="${data.link}" target="_blank" class="job-link-icon" aria-label="Visit job post">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                             </a>` : '-'}
