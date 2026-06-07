@@ -1,16 +1,29 @@
+import json
+import logging
 import re
+import time
+from typing import Any, Dict, Optional, Union
 
-from openai import OpenAI
+from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
 
 from config import OPENROUTER_API_KEY
 from paths import read_resume
 
-_client = None
+logger = logging.getLogger(__name__)
+
+VALID_COMPANY_TYPES = frozenset({"Product", "Service", "Unknown"})
+DEFAULT_SCORE_RESULT = {"score": 0, "company_type": "Unknown"}
+
+_client: Optional[OpenAI] = None
+MAX_RETRIES = 3
+RETRY_DELAY_SECONDS = 2
 
 
-def get_client():
+def get_client() -> OpenAI:
     global _client
     if _client is None:
+        if not OPENROUTER_API_KEY:
+            raise ValueError("OPENROUTER_API_KEY environment variable is not set")
         _client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
@@ -18,11 +31,10 @@ def get_client():
     return _client
 
 
-def get_score(job_description):
-    resume = read_resume()
-
-    prompt = f"""
-You are an extremely strict technical recruiter.
+def _build_prompt(resume: str, job_description: str, company_name: str) -> str:
+    company_display = company_name.strip() or "Unknown"
+    return f"""
+You are an extremely strict technical recruiter evaluating job fit.
 
 ==================================================
 CANDIDATE RESUME
@@ -31,24 +43,34 @@ CANDIDATE RESUME
 {resume}
 
 ==================================================
-JOB DESCRIPTION
+JOB DETAILS
 ==================================================
 
+Company Name: {company_display}
+
+Job Description:
 {job_description}
 
 ==================================================
 TASK
 ==================================================
 
-Compare the candidate's resume against the job description.
+Perform TWO independent evaluations:
 
-IMPORTANT:
-- Score ONLY based on the job description.
-- Ignore the job title completely.
-- Be extremely strict.
+1. RESUME MATCH — compare the candidate's resume against the job description only.
+   - Score ONLY based on the job description.
+   - Ignore the job title completely.
+   - Be extremely strict.
+
+2. COMPANY TYPE — infer whether the employer is primarily a Product, Service, or Unknown company
+   using your general knowledge of the company name and any context in the job description.
+   - Do NOT use a fixed lookup list; reason from what you know about the business model.
+   - Product: builds and sells its own software/products (e.g. Google, Stripe, Datadog).
+   - Service: IT consulting, outsourcing, staffing, or body-shop model (e.g. TCS, Infosys, Accenture).
+   - Unknown: insufficient information or ambiguous (e.g. lesser-known startup, unclear employer).
 
 ==================================================
-STRONG POSITIVE MATCH
+RESUME MATCH — STRONG POSITIVE SIGNALS
 ==================================================
 
 Give strong positive weight if the job description contains:
@@ -66,107 +88,218 @@ Give strong positive weight if the job description contains:
 - Senior Java Development
 
 ==================================================
-NEGATIVE MATCH
+RESUME MATCH — NEGATIVE SIGNALS
 ==================================================
 
 Give strong negative weight if the job description is mainly:
 
-- .NET
-- C#
-- ASP.NET
+- .NET, C#, ASP.NET
 - Power BI
-- QA
-- Testing
-- Data Engineer
-- Data Analyst
+- QA, Testing
+- Data Engineer, Data Analyst
 - Python-only roles
 - DevOps-only roles
-- SAP
-- Salesforce
-- ServiceNow
-- Support Engineer
-- Network Engineer
+- SAP, Salesforce, ServiceNow
+- Support Engineer, Network Engineer
 
 ==================================================
-SCORING GUIDE
+RESUME MATCH SCORING GUIDE (resume_match_score)
 ==================================================
 
-95-100:
-Excellent match.
-Java + Spring Boot + Microservices + React + REST APIs
+95-100: Excellent match — Java + Spring Boot + Microservices + React + REST APIs
+85-94:  Strong Java role — most important skills match
+70-84:  Good Java role — some important skills missing
+50-69:  Weak Java match
+30-49:  Poor match
+0-29:   Technology mismatch
 
-85-94:
-Strong Java role.
-Most important skills match.
-
-70-84:
-Good Java role.
-Some important skills missing.
-
-50-69:
-Weak Java match.
-
-30-49:
-Poor match.
-
-0-29:
-Technology mismatch.
+Rules:
+- If Java is NOT a primary skill, resume_match_score MUST be below 50.
+- If Spring Boot is missing, resume_match_score should rarely exceed 80.
+- If React, AWS, Kafka, Redis and Microservices are present, increase score.
+- If the role is primarily .NET, C#, QA, Data Engineering, Python-only, DevOps-only,
+  SAP, Salesforce or ServiceNow, resume_match_score should be below 30.
 
 ==================================================
-IMPORTANT RULES
+COMPANY TYPE ADJUSTMENT (company_adjustment)
 ==================================================
 
-If Java is NOT a primary skill:
-Score MUST be below 50.
+Based on company_type, set company_adjustment as follows:
 
-If Spring Boot is missing:
-Score should rarely exceed 80.
-
-If React, AWS, Kafka, Redis and Microservices are present:
-Increase score.
-
-If the role is primarily:
-.NET, C#, QA, Testing, Power BI,
-Data Engineering, Python, DevOps,
-SAP, Salesforce or ServiceNow:
-
-Score should be below 30.
+- Product  → positive integer between 10 and 20 (stronger product companies → higher bonus)
+- Service  → negative integer between -30 and -20 (large consulting firms → larger penalty)
+- Unknown  → 0
 
 ==================================================
-OUTPUT
+FINAL SCORE
 ==================================================
 
-Return ONLY a single integer.
+final_score = resume_match_score + company_adjustment
+Clamp final_score to an integer between 0 and 100.
 
-Examples:
+==================================================
+OUTPUT FORMAT
+==================================================
 
-95
-87
-42
-15
+Return ONLY valid JSON with exactly these keys:
 
-Do not explain.
-Do not write any text.
-Return only the number.
-"""
+{{
+  "resume_match_score": <integer 0-100>,
+  "company_type": "Product" | "Service" | "Unknown",
+  "company_adjustment": <integer>,
+  "final_score": <integer 0-100>
+}}
 
-    response = get_client().chat.completions.create(
-        model="deepseek/deepseek-chat-v3",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-    )
+Do not include markdown, explanations, or any text outside the JSON object.
+""".strip()
 
-    result = response.choices[0].message.content.strip()
 
-    print("AI Response:", result)
+def _extract_json(text: str) -> Optional[Dict[str, Any]]:
+    if not text:
+        return None
 
-    match = re.search(r"\d+", result)
+    text = text.strip()
 
-    if match:
-        return int(match.group())
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
 
+    fenced_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL | re.IGNORECASE)
+    if fenced_match:
+        try:
+            parsed = json.loads(fenced_match.group(1))
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+    object_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if object_match:
+        try:
+            parsed = json.loads(object_match.group(0))
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+    return None
+
+
+def _clamp(value: int, minimum: int, maximum: int) -> int:
+    return max(minimum, min(maximum, value))
+
+
+def _normalize_company_type(raw_type: Any) -> str:
+    if not isinstance(raw_type, str):
+        return "Unknown"
+
+    normalized = raw_type.strip().title()
+    if normalized in VALID_COMPANY_TYPES:
+        return normalized
+    return "Unknown"
+
+
+def _normalize_adjustment(company_type: str, raw_adjustment: Any) -> int:
+    try:
+        adjustment = int(raw_adjustment)
+    except (TypeError, ValueError):
+        adjustment = 0
+
+    if company_type == "Product":
+        return _clamp(adjustment, 10, 20)
+    if company_type == "Service":
+        return _clamp(adjustment, -30, -20)
     return 0
+
+
+def _parse_score_response(raw_content: str) -> Dict[str, Union[int, str]]:
+    payload = _extract_json(raw_content)
+    if not payload:
+        logger.warning("Failed to parse AI response as JSON: %s", raw_content)
+        return DEFAULT_SCORE_RESULT.copy()
+
+    try:
+        resume_match_score = _clamp(int(payload.get("resume_match_score", 0)), 0, 100)
+    except (TypeError, ValueError):
+        resume_match_score = 0
+
+    company_type = _normalize_company_type(payload.get("company_type"))
+    company_adjustment = _normalize_adjustment(company_type, payload.get("company_adjustment"))
+
+    try:
+        final_score = int(payload.get("final_score", resume_match_score + company_adjustment))
+    except (TypeError, ValueError):
+        final_score = resume_match_score + company_adjustment
+
+    final_score = _clamp(final_score, 0, 100)
+
+    # Reconcile if the model's final_score disagrees with the formula.
+    computed_final = _clamp(resume_match_score + company_adjustment, 0, 100)
+    if abs(final_score - computed_final) > 1:
+        final_score = computed_final
+
+    return {
+        "score": final_score,
+        "company_type": company_type,
+    }
+
+
+def get_score(job_description: str, company_name: str = "") -> Dict[str, Union[int, str]]:
+    """
+    Score a job against the candidate resume and company type.
+
+    Returns:
+        {"score": <int 0-100>, "company_type": "Product" | "Service" | "Unknown"}
+    """
+    if not job_description or not job_description.strip():
+        logger.warning("Empty job description provided for company: %s", company_name)
+        return DEFAULT_SCORE_RESULT.copy()
+
+    try:
+        resume = read_resume()
+    except Exception as exc:
+        logger.error("Failed to read resume: %s", exc)
+        raise
+
+    prompt = _build_prompt(resume, job_description, company_name)
+    last_error: Optional[Exception] = None
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = get_client().chat.completions.create(
+                model="deepseek/deepseek-chat-v3",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+            )
+            raw_content = (response.choices[0].message.content or "").strip()
+            print(f"AI Response: {raw_content}")
+
+            result = _parse_score_response(raw_content)
+            print(
+                f"Parsed score: {result['score']} | Company type: {result['company_type']}"
+            )
+            return result
+
+        except (RateLimitError, APITimeoutError, APIConnectionError) as exc:
+            last_error = exc
+            logger.warning(
+                "Transient OpenRouter error (attempt %s/%s): %s",
+                attempt,
+                MAX_RETRIES,
+                exc,
+            )
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_DELAY_SECONDS * attempt)
+                continue
+            break
+
+        except Exception as exc:
+            last_error = exc
+            logger.error("Unexpected scoring error: %s", exc)
+            break
+
+    logger.error("Scoring failed after retries: %s", last_error)
+    return DEFAULT_SCORE_RESULT.copy()

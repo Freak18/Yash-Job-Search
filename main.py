@@ -1,5 +1,5 @@
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from apify_client import ApifyClient
 
@@ -7,7 +7,38 @@ from config import APIFY_TOKEN, SHEET_NAME
 from scorer import get_score
 from sheets import get_gspread_client
 
-JOB_LINK_COLUMN = 3
+WORKSHEET_NAME = "Jobs"
+EXPECTED_HEADERS = [
+    "Job Title",
+    "Company",
+    "Company Type",
+    "Job Link",
+    "Score",
+    "Posted Date",
+    "Date Added",
+]
+JOB_LINK_COLUMN = 4
+DEFAULT_MIN_SCORE = 85
+DEFAULT_DAYS_FILTER = "3"
+
+TIME_FILTERS = {
+    "1": "r86400",      
+    "3": "r259200",     
+    "4": "r345600",     
+    "7": "r604800",     
+    "15": "r1296000",   
+    "30": "r2592000"    
+}
+
+SEARCH_KEYWORDS = [
+    "Java Developer",
+    "Senior Java Developer",
+    "Full Stack Developer",
+    "Senior Software Engineer",
+    "Java React Developer",
+]
+
+SEARCH_LOCATION = "Hyderabad"
 
 
 def normalize_job_link(link: str) -> str:
@@ -44,7 +75,85 @@ def is_duplicate_job(link: str, existing_links: set) -> bool:
     return bool(normalized) and normalized in existing_links
 
 
-def run_job_scraper(count=10, min_score=80, status_callback=None):
+def resolve_time_filter(days_filter: str) -> str:
+    key = str(days_filter).strip()
+    if key not in TIME_FILTERS:
+        key = DEFAULT_DAYS_FILTER
+    return TIME_FILTERS[key]
+
+
+def build_linkedin_search_urls(days_filter: str) -> list:
+    time_filter = resolve_time_filter(days_filter)
+    encoded_location = quote(SEARCH_LOCATION)
+
+    urls = []
+    for keyword in SEARCH_KEYWORDS:
+        encoded_keyword = quote(keyword)
+        urls.append(
+            "https://www.linkedin.com/jobs/search/"
+            f"?keywords={encoded_keyword}&location={encoded_location}&f_TPR={time_filter}"
+        )
+    return urls
+
+
+def ensure_worksheet_headers(worksheet, emit) -> None:
+    try:
+        row1 = worksheet.row_values(1)
+    except Exception:
+        row1 = []
+
+    if row1 == EXPECTED_HEADERS:
+        return
+
+    if not row1:
+        worksheet.append_row(EXPECTED_HEADERS)
+        emit("log", "Initialized worksheet headers.")
+        return
+
+    if row1 and row1[0] == "Job Title" and "Company Type" not in row1:
+        emit("log", "Migrating sheet: inserting 'Company Type' column...")
+        try:
+            worksheet.insert_cols([["Company Type"]], col=3, inherit_from_before=False)
+        except TypeError:
+            worksheet.insert_cols([["Company Type"]], col=3)
+
+        row1 = worksheet.row_values(1)
+        if row1 != EXPECTED_HEADERS:
+            end_col = chr(64 + len(EXPECTED_HEADERS))
+            worksheet.update(
+                range_name=f"A1:{end_col}1",
+                values=[EXPECTED_HEADERS],
+            )
+        emit("log", "Sheet migration complete.")
+        return
+
+    if row1[0] != "Job Title":
+        emit("log", "Headers not found in Google Sheet. Adding them to row 1...")
+        worksheet.insert_row(EXPECTED_HEADERS, index=1)
+
+
+def get_or_create_worksheet(spreadsheet, emit):
+    try:
+        worksheet = spreadsheet.worksheet(WORKSHEET_NAME)
+        ensure_worksheet_headers(worksheet, emit)
+        return worksheet
+    except Exception:
+        worksheet = spreadsheet.add_worksheet(
+            title=WORKSHEET_NAME,
+            rows=10000,
+            cols=len(EXPECTED_HEADERS),
+        )
+        worksheet.append_row(EXPECTED_HEADERS)
+        emit("log", f"Created worksheet '{WORKSHEET_NAME}'.")
+        return worksheet
+
+
+def run_job_scraper(
+    count=10,
+    min_score=DEFAULT_MIN_SCORE,
+    days_filter=DEFAULT_DAYS_FILTER,
+    status_callback=None,
+):
     def emit(event_type, message, **kwargs):
         if status_callback:
             status_callback({"type": event_type, "message": message, **kwargs})
@@ -55,27 +164,7 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
     try:
         gc = get_gspread_client()
         spreadsheet = gc.open(SHEET_NAME)
-        WORKSHEET_NAME = "Jobs"
-        expected_headers = [
-            "Job Title",
-            "Company",
-            "Job Link",
-            "Score",
-            "Posted Date",
-            "Date Added",
-        ]
-        try:
-            worksheet = spreadsheet.worksheet(WORKSHEET_NAME)
-            try:
-                row1 = worksheet.row_values(1)
-            except Exception:
-                row1 = []
-            if not row1 or row1[0] != "Job Title":
-                emit("log", "Headers not found in Google Sheet. Adding them to row 1...")
-                worksheet.insert_row(expected_headers, index=1)
-        except Exception:
-            worksheet = spreadsheet.add_worksheet(title=WORKSHEET_NAME, rows=10000, cols=10)
-            worksheet.append_row(expected_headers)
+        worksheet = get_or_create_worksheet(spreadsheet, emit)
     except Exception as e:
         error_msg = f"Google Sheets connection failed: {str(e)}"
         emit("log", error_msg, status="error")
@@ -89,7 +178,12 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
 
     emit("log", f"Loaded {len(existing_links)} existing job links for duplicate check")
 
-    emit("log", "Starting LinkedIn Scraper...")
+    search_urls = build_linkedin_search_urls(days_filter)
+    time_filter = resolve_time_filter(days_filter)
+    emit(
+        "log",
+        f"Starting LinkedIn Scraper (posted within {days_filter} day(s), filter={time_filter})...",
+    )
     try:
         client = ApifyClient(APIFY_TOKEN)
         run = client.actor("curious_coder/linkedin-jobs-scraper").call(
@@ -98,13 +192,7 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
                 "scrapeCompany": True,
                 "splitByLocation": False,
                 "splitCountry": "IN",
-                "urls": [
-                    "https://www.linkedin.com/jobs/search/?keywords=Java%20Developer&location=Hyderabad",
-                    "https://www.linkedin.com/jobs/search/?keywords=Senior%20Java%20Developer&location=Hyderabad",
-                    "https://www.linkedin.com/jobs/search/?keywords=Full%20Stack%20Developer&location=Hyderabad",
-                    "https://www.linkedin.com/jobs/search/?keywords=Senior%20Software%20Engineer&location=Hyderabad",
-                    "https://www.linkedin.com/jobs/search/?keywords=Java%20React%20Developer&location=Hyderabad",
-                ],
+                "urls": search_urls,
             }
         )
         dataset_id = run["defaultDatasetId"]
@@ -118,7 +206,11 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
 
     total_jobs = len(items)
     emit("log", f"Jobs Found: {total_jobs}")
-    emit("start_processing", f"Found {total_jobs} jobs. Beginning AI scoring and filtering...", total=total_jobs)
+    emit(
+        "start_processing",
+        f"Found {total_jobs} jobs. Beginning AI scoring and filtering...",
+        total=total_jobs,
+    )
 
     jobs_added = 0
     jobs_skipped = 0
@@ -164,16 +256,19 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
                 continue
 
             emit("log", f"Scoring job {index + 1}/{total_jobs}: {title} at {company}")
-            score = get_score(description)
+            score_result = get_score(description, company_name=company)
+            score = score_result["score"]
+            company_type = score_result["company_type"]
 
             if score < min_score:
                 jobs_skipped += 1
                 emit(
                     "job_processed",
-                    f"Low Match Score ({score}): {title} at {company}",
+                    f"Low Match Score ({score}, {company_type}): {title} at {company}",
                     title=title,
                     company=company,
                     score=score,
+                    company_type=company_type,
                     action=f"Skipped (Score < {min_score})",
                     link=link,
                     index=index + 1,
@@ -188,6 +283,7 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
                     title=title,
                     company=company,
                     score=score,
+                    company_type=company_type,
                     action="Duplicate (Skipped)",
                     link=link,
                     index=index + 1,
@@ -197,6 +293,7 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
             worksheet.append_row([
                 title,
                 company,
+                company_type,
                 link,
                 score,
                 posted_date,
@@ -207,19 +304,31 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
             jobs_added += 1
             emit(
                 "job_processed",
-                f"Added: {title} at {company} (Score: {score})",
+                f"Added: {title} at {company} (Score: {score}, Type: {company_type})",
                 title=title,
                 company=company,
                 score=score,
+                company_type=company_type,
                 action="Added to Sheet",
                 link=link,
                 index=index + 1,
             )
 
         except Exception as e:
-            emit("log", f"Failed to process job '{title}': {str(e)}", status="error")
+            jobs_skipped += 1
+            emit(
+                "log",
+                f"Failed to process job '{title}': {str(e)}",
+                status="error",
+            )
 
-    emit("completed", "COMPLETED", added=jobs_added, skipped=jobs_skipped, duplicates=duplicate_jobs)
+    emit(
+        "completed",
+        "COMPLETED",
+        added=jobs_added,
+        skipped=jobs_skipped,
+        duplicates=duplicate_jobs,
+    )
 
     return {
         "added": jobs_added,
@@ -230,4 +339,4 @@ def run_job_scraper(count=10, min_score=80, status_callback=None):
 
 if __name__ == "__main__":
     print("Starting Job Scrapper in CLI mode...")
-    run_job_scraper(count=10, min_score=80)
+    run_job_scraper(count=10, min_score=DEFAULT_MIN_SCORE)

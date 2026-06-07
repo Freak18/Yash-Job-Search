@@ -4,7 +4,7 @@ import threading
 
 from flask import Flask, Response, render_template, request
 
-from main import run_job_scraper
+from main import DEFAULT_DAYS_FILTER, TIME_FILTERS, run_job_scraper
 from paths import BASE_DIR, read_resume, write_resume
 
 app = Flask(
@@ -38,8 +38,13 @@ def manage_resume():
 
 @app.route("/api/run")
 def run_scraper():
-    count = int(request.args.get("count", 10))
-    min_score = int(request.args.get("min_score", 80))
+    count = int(request.args.get("jobCount", request.args.get("count", 10)))
+    min_score = int(
+        request.args.get("confidenceScore", request.args.get("min_score", 80))
+    )
+    days_filter = request.args.get("daysFilter", DEFAULT_DAYS_FILTER)
+    if str(days_filter) not in TIME_FILTERS:
+        days_filter = DEFAULT_DAYS_FILTER
 
     def generate():
         q = queue.Queue()
@@ -49,7 +54,12 @@ def run_scraper():
 
         def thread_worker():
             try:
-                run_job_scraper(count=count, min_score=min_score, status_callback=callback)
+                run_job_scraper(
+                    count=count,
+                    min_score=min_score,
+                    days_filter=str(days_filter),
+                    status_callback=callback,
+                )
             except Exception as e:
                 q.put({"type": "log", "message": f"Fatal execution error: {str(e)}", "status": "error"})
             finally:
