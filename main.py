@@ -31,11 +31,17 @@ TIME_FILTERS = {
 }
 
 SEARCH_KEYWORDS = [
-    "Java Developer",
     "Senior Java Developer",
-    "Full Stack Developer",
-    "Senior Software Engineer",
+    "Java Full Stack Developer",
+    "Java Backend Developer",
+    "Spring Boot Developer",
+    "Java Microservices Developer",
+    "Senior Backend Engineer",
     "Java React Developer",
+    "Lead Java Developer",
+    "Senior Software Engineer",
+    "Software Engineer III",
+    "Member of Technical Staff"
 ]
 
 SEARCH_LOCATION = "Hyderabad"
