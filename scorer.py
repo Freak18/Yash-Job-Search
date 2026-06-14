@@ -70,6 +70,17 @@ Perform TWO independent evaluations:
    - Unknown: insufficient information or ambiguous (e.g. lesser-known startup, unclear employer).
 
 ==================================================
+RESUME MATCH — EXPERIENCE AND SKILLS REQUIREMENTS
+==================================================
+
+Evaluate the required years of experience and skills:
+- The candidate's resume shows approximately 7 years of experience.
+- The required experience for the job MUST NOT be more than 8 years.
+- If the job description requires more than 8 years of experience (e.g. 9+, 10+, 12+ years, or Senior/Lead/Architect roles demanding >8 years), the match is poor and you MUST reduce the resume_match_score drastically (it should not exceed 50).
+- If the job description requires 8 years of experience or less (e.g. 5-8 years, 3-5 years, or unspecified mid-senior level), it matches the candidate's experience.
+- Carefully evaluate core stack matching: verify if they require Java, Spring Boot, Microservices, and optionally React.
+
+==================================================
 RESUME MATCH — STRONG POSITIVE SIGNALS
 ==================================================
 
@@ -119,6 +130,7 @@ Rules:
 - If React, AWS, Kafka, Redis and Microservices are present, increase score.
 - If the role is primarily .NET, C#, QA, Data Engineering, Python-only, DevOps-only,
   SAP, Salesforce or ServiceNow, resume_match_score should be below 30.
+- Crucial Experience Penalty: If the job description requires more than 8 years of experience (e.g. 9+ years, 10+ years, etc.), the resume_match_score MUST be reduced drastically and MUST NOT exceed 50.
 
 ==================================================
 COMPANY TYPE ADJUSTMENT (company_adjustment)
@@ -247,7 +259,7 @@ def _parse_score_response(raw_content: str) -> Dict[str, Union[int, str]]:
     }
 
 
-def get_score(job_description: str, company_name: str = "") -> Dict[str, Union[int, str]]:
+def get_score(job_description: str, company_name: str = "", log_callback: Optional[Any] = None) -> Dict[str, Union[int, str]]:
     """
     Score a job against the candidate resume and company type.
 
@@ -273,6 +285,7 @@ def get_score(job_description: str, company_name: str = "") -> Dict[str, Union[i
                 model="deepseek/deepseek-chat-v3",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
+                max_tokens=500,
             )
             raw_content = (response.choices[0].message.content or "").strip()
             print(f"AI Response: {raw_content}")
@@ -281,6 +294,19 @@ def get_score(job_description: str, company_name: str = "") -> Dict[str, Union[i
             print(
                 f"Parsed score: {result['score']} | Company type: {result['company_type']}"
             )
+            if log_callback:
+                parsed_payload = _extract_json(raw_content)
+                if parsed_payload:
+                    log_callback(
+                        f"LLM score: {result['score']} (Match: {parsed_payload.get('resume_match_score')}, "
+                        f"Type: {result['company_type']}, Adj: {parsed_payload.get('company_adjustment')})",
+                        status="success"
+                    )
+                else:
+                    log_callback(
+                        f"LLM returned invalid JSON. Raw response: {raw_content}",
+                        status="warning"
+                    )
             return result
 
         except (RateLimitError, APITimeoutError, APIConnectionError) as exc:
@@ -291,6 +317,11 @@ def get_score(job_description: str, company_name: str = "") -> Dict[str, Union[i
                 MAX_RETRIES,
                 exc,
             )
+            if log_callback:
+                log_callback(
+                    f"Transient LLM API Error (attempt {attempt}/{MAX_RETRIES}): {str(exc)}",
+                    status="warning"
+                )
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY_SECONDS * attempt)
                 continue
@@ -299,6 +330,11 @@ def get_score(job_description: str, company_name: str = "") -> Dict[str, Union[i
         except Exception as exc:
             last_error = exc
             logger.error("Unexpected scoring error: %s", exc)
+            if log_callback:
+                log_callback(
+                    f"LLM API Error: {str(exc)}",
+                    status="error"
+                )
             break
 
     logger.error("Scoring failed after retries: %s", last_error)

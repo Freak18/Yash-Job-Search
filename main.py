@@ -262,7 +262,11 @@ def run_job_scraper(
                 continue
 
             emit("log", f"Scoring job {index + 1}/{total_jobs}: {title} at {company}")
-            score_result = get_score(description, company_name=company)
+            score_result = get_score(
+                description,
+                company_name=company,
+                log_callback=lambda msg, status="info": emit("log", msg, status=status)
+            )
             score = score_result["score"]
             company_type = score_result["company_type"]
 
