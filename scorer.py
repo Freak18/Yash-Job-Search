@@ -282,7 +282,7 @@ def get_score(job_description: str, company_name: str = "", log_callback: Option
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = get_client().chat.completions.create(
-                model="deepseek/deepseek-chat-v3",
+                model="nvidia/nemotron-3-ultra-550b-a55b:free",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
                 max_tokens=500,
