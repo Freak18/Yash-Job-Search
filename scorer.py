@@ -34,6 +34,8 @@ def get_client() -> OpenAI:
 def _build_prompt(resume: str, job_description: str, company_name: str) -> str:
     company_display = company_name.strip() or "Unknown"
     return f"""
+CRITICAL REQUIREMENT: RESPOND WITH ONLY THE RAW JSON OBJECT. DO NOT OUTPUT ANY PREAMBLE, REASONING, OR THINKING TEXT.
+
 You are an extremely strict technical recruiter evaluating job fit.
 
 ==================================================
@@ -153,7 +155,7 @@ Clamp final_score to an integer between 0 and 100.
 OUTPUT FORMAT
 ==================================================
 
-Return ONLY valid JSON with exactly these keys:
+Return ONLY a raw JSON object with NO preamble, explanation, or markdown formatting outside the JSON:
 
 {{
   "resume_match_score": <integer 0-100>,
@@ -161,8 +163,6 @@ Return ONLY valid JSON with exactly these keys:
   "company_adjustment": <integer>,
   "final_score": <integer 0-100>
 }}
-
-Do not include markdown, explanations, or any text outside the JSON object.
 """.strip()
 
 
@@ -179,19 +179,28 @@ def _extract_json(text: str) -> Optional[Dict[str, Any]]:
     except json.JSONDecodeError:
         pass
 
-    fenced_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL | re.IGNORECASE)
-    if fenced_match:
+    fenced_matches = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL | re.IGNORECASE)
+    for match in reversed(fenced_matches):
         try:
-            parsed = json.loads(fenced_match.group(1))
+            parsed = json.loads(match)
             if isinstance(parsed, dict):
                 return parsed
         except json.JSONDecodeError:
             pass
 
-    object_match = re.search(r"\{.*\}", text, re.DOTALL)
-    if object_match:
+    json_objects = re.findall(r"\{[^{}]*\"resume_match_score\"[^{}]*\}", text, re.DOTALL)
+    for match in reversed(json_objects):
         try:
-            parsed = json.loads(object_match.group(0))
+            parsed = json.loads(match)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+    object_matches = re.findall(r"\{.*\}", text, re.DOTALL)
+    for match in reversed(object_matches):
+        try:
+            parsed = json.loads(match)
             if isinstance(parsed, dict):
                 return parsed
         except json.JSONDecodeError:
@@ -282,10 +291,10 @@ def get_score(job_description: str, company_name: str = "", log_callback: Option
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = get_client().chat.completions.create(
-                model="nvidia/nemotron-3-ultra-550b-a55b:free",
+                model="minimax/minimax-m3:free",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
-                max_tokens=500,
+                max_tokens=1500,
             )
             raw_content = (response.choices[0].message.content or "").strip()
             print(f"AI Response: {raw_content}")

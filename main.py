@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 from urllib.parse import quote, urlparse
 
@@ -269,6 +270,7 @@ def run_job_scraper(
             )
             score = score_result["score"]
             company_type = score_result["company_type"]
+            time.sleep(1.5)
 
             if score < min_score:
                 jobs_skipped += 1
