@@ -127,13 +127,13 @@ OpenRouter
 Stored In:
 
 ```text
-OPENROUTER_API_KEY
+GEMINI_API_KEY (Google AI Studio) or OPENROUTER_API_KEY (OpenRouter)
 ```
 
 Model Used:
 
 ```text
-openrouter/free
+gemini-2.5-flash (Google AI Studio) or openrouter/free (OpenRouter)
 ```
 
 ---

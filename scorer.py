@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Union
 
 from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
 
-from config import OPENROUTER_API_KEY, OPENROUTER_MODEL
+from config import LLM_API_KEY, LLM_BASE_URL, OPENROUTER_MODEL
 from paths import read_resume
 
 logger = logging.getLogger(__name__)
@@ -22,11 +22,11 @@ RETRY_DELAY_SECONDS = 2
 def get_client() -> OpenAI:
     global _client
     if _client is None:
-        if not OPENROUTER_API_KEY:
-            raise ValueError("OPENROUTER_API_KEY environment variable is not set")
+        if not LLM_API_KEY:
+            raise ValueError("Neither GEMINI_API_KEY nor OPENROUTER_API_KEY environment variable is set.")
         _client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=OPENROUTER_API_KEY,
+            base_url=LLM_BASE_URL,
+            api_key=LLM_API_KEY,
         )
     return _client
 

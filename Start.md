@@ -8,7 +8,8 @@ Create a `.env` file in this directory with:
 
 ```text
 APIFY_TOKEN=
-OPENROUTER_API_KEY=
+GEMINI_API_KEY=          # (Or OPENROUTER_API_KEY)
+OPENROUTER_API_KEY=      # (If not using GEMINI_API_KEY)
 SHEET_NAME=Job Scrapping
 GOOGLE_CREDENTIALS=
 ```
