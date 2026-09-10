@@ -133,7 +133,7 @@ OPENROUTER_API_KEY
 Model Used:
 
 ```text
-google/gemma-4-26b-a4b-it:free
+openrouter/free
 ```
 
 ---
