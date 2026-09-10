@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Union
 
 from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
 
-from config import OPENROUTER_API_KEY
+from config import OPENROUTER_API_KEY, OPENROUTER_MODEL
 from paths import read_resume
 
 logger = logging.getLogger(__name__)
@@ -291,7 +291,7 @@ def get_score(job_description: str, company_name: str = "", log_callback: Option
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = get_client().chat.completions.create(
-                model="minimax/minimax-m3:free",
+                model=OPENROUTER_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
                 max_tokens=1500,

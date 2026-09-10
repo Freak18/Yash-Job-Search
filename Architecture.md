@@ -133,7 +133,7 @@ OPENROUTER_API_KEY
 Model Used:
 
 ```text
-deepseek/deepseek-chat-v3
+google/gemma-4-26b-a4b-it:free
 ```
 
 ---
