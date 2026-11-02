@@ -1,0 +1,43 @@
+Companies : 
+
+1. T mobile 
+2. Wells Fargo
+3. PepsiCo
+4. Vanguard 
+5. Charles Schwab’s
+6. Warner bros
+7. Marriott tech accelerator 
+8. GE vernova 
+9. ADP global
+10. Costco It 
+11. Bank of america
+12. Experian
+13. Gap inc
+13 . CIBC
+14 . Duestche borse group
+15 . AA tech hub
+16. Bristol Myers squibb
+17. TJX
+18. Chubb
+19. Swiss Re
+20. Service now
+21. Stripe
+22. Atlassian
+23. Amazon
+24. Google
+25. Microsoft
+26. Apple
+27. IDFC bank
+28. Johnson & Johnson Innovative Medicine
+29. Honeywell 
+30. Amgen
+31. DE shaw and co
+32. Broadcom
+33. Wise
+34. ICE
+35. Micron
+36. Fanatics
+37. Factset
+38. MSD
+39. Macquarie Group
+40. Teradata

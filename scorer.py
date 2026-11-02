@@ -11,8 +11,8 @@ from paths import read_resume
 
 logger = logging.getLogger(__name__)
 
-VALID_COMPANY_TYPES = frozenset({"Product", "Service", "Unknown"})
-DEFAULT_SCORE_RESULT = {"score": 0, "company_type": "Unknown"}
+VALID_COMPANY_TYPES = frozenset({"Target", "Unknown"})
+DEFAULT_SCORE_RESULT = {"score": 0, "company_type": "Target", "reason": ""}
 
 _client: Optional[OpenAI] = None
 MAX_RETRIES = 3
@@ -32,11 +32,11 @@ def get_client() -> OpenAI:
 
 
 def _build_prompt(resume: str, job_description: str, company_name: str) -> str:
-    company_display = company_name.strip() or "Unknown"
+    company_display = company_name.strip() or "Target Company"
     return f"""
 CRITICAL REQUIREMENT: RESPOND WITH ONLY THE RAW JSON OBJECT. DO NOT OUTPUT ANY PREAMBLE, REASONING, OR THINKING TEXT.
 
-You are an extremely strict technical recruiter evaluating job fit.
+You are an extremely strict technical recruiter evaluating job fit for a target employer.
 
 ==================================================
 CANDIDATE RESUME
@@ -57,19 +57,10 @@ Job Description:
 TASK
 ==================================================
 
-Perform TWO independent evaluations:
-
-1. RESUME MATCH — compare the candidate's resume against the job description only.
-   - Score ONLY based on the job description.
-   - Ignore the job title completely.
-   - Be extremely strict.
-
-2. COMPANY TYPE — infer whether the employer is primarily a Product, Service, or Unknown company
-   using your general knowledge of the company name and any context in the job description.
-   - Do NOT use a fixed lookup list; reason from what you know about the business model.
-   - Product: builds and sells its own software/products (e.g. Google, Stripe, Datadog).
-   - Service: IT consulting, outsourcing, staffing, or body-shop model (e.g. TCS, Infosys, Accenture).
-   - Unknown: insufficient information or ambiguous (e.g. lesser-known startup, unclear employer).
+Evaluate the candidate's resume match against the job description only.
+- Score ONLY based on the job description.
+- Ignore the job title completely.
+- Be extremely strict.
 
 ==================================================
 RESUME MATCH — EXPERIENCE AND SKILLS REQUIREMENTS
@@ -78,7 +69,7 @@ RESUME MATCH — EXPERIENCE AND SKILLS REQUIREMENTS
 Evaluate the required years of experience and skills:
 - The candidate's resume shows approximately 7 years of experience.
 - The required experience for the job MUST NOT be more than 8 years.
-- If the job description requires more than 8 years of experience (e.g. 9+, 10+, 12+ years, or Senior/Lead/Architect roles demanding >8 years), the match is poor and you MUST reduce the resume_match_score drastically (it should not exceed 50).
+- If the job description requires more than 8 years of experience (e.g. 9+, 10+, 12+ years, or Senior/Lead/Architect roles demanding >8 years), the match is poor and you MUST reduce the score drastically (it should not exceed 50).
 - If the job description requires 8 years of experience or less (e.g. 5-8 years, 3-5 years, or unspecified mid-senior level), it matches the candidate's experience.
 - Carefully evaluate core stack matching: verify if they require Java, Spring Boot, Microservices, and optionally React.
 
@@ -116,7 +107,7 @@ Give strong negative weight if the job description is mainly:
 - Support Engineer, Network Engineer
 
 ==================================================
-RESUME MATCH SCORING GUIDE (resume_match_score)
+RESUME MATCH SCORING GUIDE (score)
 ==================================================
 
 95-100: Excellent match — Java + Spring Boot + Microservices + React + REST APIs
@@ -127,29 +118,12 @@ RESUME MATCH SCORING GUIDE (resume_match_score)
 0-29:   Technology mismatch
 
 Rules:
-- If Java is NOT a primary skill, resume_match_score MUST be below 50.
-- If Spring Boot is missing, resume_match_score should rarely exceed 80.
+- If Java is NOT a primary skill, score MUST be below 50.
+- If Spring Boot is missing, score should rarely exceed 80.
 - If React, AWS, Kafka, Redis and Microservices are present, increase score.
 - If the role is primarily .NET, C#, QA, Data Engineering, Python-only, DevOps-only,
-  SAP, Salesforce or ServiceNow, resume_match_score should be below 30.
-- Crucial Experience Penalty: If the job description requires more than 8 years of experience (e.g. 9+ years, 10+ years, etc.), the resume_match_score MUST be reduced drastically and MUST NOT exceed 50.
-
-==================================================
-COMPANY TYPE ADJUSTMENT (company_adjustment)
-==================================================
-
-Based on company_type, set company_adjustment as follows:
-
-- Product  → positive integer between 10 and 20 (stronger product companies → higher bonus)
-- Service  → negative integer between -30 and -20 (large consulting firms → larger penalty)
-- Unknown  → 0
-
-==================================================
-FINAL SCORE
-==================================================
-
-final_score = resume_match_score + company_adjustment
-Clamp final_score to an integer between 0 and 100.
+  SAP, Salesforce or ServiceNow administration, score should be below 30.
+- Crucial Experience Penalty: If the job description requires more than 8 years of experience (e.g. 9+ years, 10+ years, etc.), the score MUST be reduced drastically and MUST NOT exceed 50.
 
 ==================================================
 OUTPUT FORMAT
@@ -158,10 +132,8 @@ OUTPUT FORMAT
 Return ONLY a raw JSON object with NO preamble, explanation, or markdown formatting outside the JSON:
 
 {{
-  "resume_match_score": <integer 0-100>,
-  "company_type": "Product" | "Service" | "Unknown",
-  "company_adjustment": <integer>,
-  "final_score": <integer 0-100>
+  "score": <integer 0-100>,
+  "reason": "<short 1-sentence summary of fit>"
 }}
 """.strip()
 
@@ -188,7 +160,7 @@ def _extract_json(text: str) -> Optional[Dict[str, Any]]:
         except json.JSONDecodeError:
             pass
 
-    json_objects = re.findall(r"\{[^{}]*\"resume_match_score\"[^{}]*\}", text, re.DOTALL)
+    json_objects = re.findall(r"\{[^{}]*\"score\"[^{}]*\}", text, re.DOTALL)
     for match in reversed(json_objects):
         try:
             parsed = json.loads(match)
@@ -213,29 +185,6 @@ def _clamp(value: int, minimum: int, maximum: int) -> int:
     return max(minimum, min(maximum, value))
 
 
-def _normalize_company_type(raw_type: Any) -> str:
-    if not isinstance(raw_type, str):
-        return "Unknown"
-
-    normalized = raw_type.strip().title()
-    if normalized in VALID_COMPANY_TYPES:
-        return normalized
-    return "Unknown"
-
-
-def _normalize_adjustment(company_type: str, raw_adjustment: Any) -> int:
-    try:
-        adjustment = int(raw_adjustment)
-    except (TypeError, ValueError):
-        adjustment = 0
-
-    if company_type == "Product":
-        return _clamp(adjustment, 10, 20)
-    if company_type == "Service":
-        return _clamp(adjustment, -30, -20)
-    return 0
-
-
 def _parse_score_response(raw_content: str) -> Dict[str, Union[int, str]]:
     payload = _extract_json(raw_content)
     if not payload:
@@ -243,37 +192,26 @@ def _parse_score_response(raw_content: str) -> Dict[str, Union[int, str]]:
         return DEFAULT_SCORE_RESULT.copy()
 
     try:
-        resume_match_score = _clamp(int(payload.get("resume_match_score", 0)), 0, 100)
+        raw_score = payload.get("score", payload.get("resume_match_score", 0))
+        final_score = _clamp(int(raw_score), 0, 100)
     except (TypeError, ValueError):
-        resume_match_score = 0
+        final_score = 0
 
-    company_type = _normalize_company_type(payload.get("company_type"))
-    company_adjustment = _normalize_adjustment(company_type, payload.get("company_adjustment"))
-
-    try:
-        final_score = int(payload.get("final_score", resume_match_score + company_adjustment))
-    except (TypeError, ValueError):
-        final_score = resume_match_score + company_adjustment
-
-    final_score = _clamp(final_score, 0, 100)
-
-    # Reconcile if the model's final_score disagrees with the formula.
-    computed_final = _clamp(resume_match_score + company_adjustment, 0, 100)
-    if abs(final_score - computed_final) > 1:
-        final_score = computed_final
+    reason = str(payload.get("reason", "")).strip()
 
     return {
         "score": final_score,
-        "company_type": company_type,
+        "company_type": "Target",
+        "reason": reason,
     }
 
 
 def get_score(job_description: str, company_name: str = "", log_callback: Optional[Any] = None) -> Dict[str, Union[int, str]]:
     """
-    Score a job against the candidate resume and company type.
+    Score a job against the candidate resume.
 
     Returns:
-        {"score": <int 0-100>, "company_type": "Product" | "Service" | "Unknown"}
+        {"score": <int 0-100>, "company_type": "Target", "reason": "<str>"}
     """
     if not job_description or not job_description.strip():
         logger.warning("Empty job description provided for company: %s", company_name)
@@ -301,14 +239,14 @@ def get_score(job_description: str, company_name: str = "", log_callback: Option
 
             result = _parse_score_response(raw_content)
             print(
-                f"Parsed score: {result['score']} | Company type: {result['company_type']}"
+                f"Parsed score: {result['score']} | Reason: {result.get('reason', '')}"
             )
             if log_callback:
                 parsed_payload = _extract_json(raw_content)
                 if parsed_payload:
+                    reason_str = f" - {result['reason']}" if result.get('reason') else ""
                     log_callback(
-                        f"LLM score: {result['score']} (Match: {parsed_payload.get('resume_match_score')}, "
-                        f"Type: {result['company_type']}, Adj: {parsed_payload.get('company_adjustment')})",
+                        f"LLM score: {result['score']}/100{reason_str}",
                         status="success"
                     )
                 else:

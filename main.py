@@ -5,6 +5,11 @@ from urllib.parse import quote, urlparse
 from apify_client import ApifyClient
 
 from config import APIFY_TOKEN, SHEET_NAME
+from paths import (
+    get_target_company_ids,
+    is_target_company,
+    load_target_companies,
+)
 from scorer import get_score
 from sheets import get_gspread_client
 
@@ -89,18 +94,34 @@ def resolve_time_filter(days_filter: str) -> str:
     return TIME_FILTERS[key]
 
 
+def chunk_list(items: list, chunk_size: int = 7) -> list:
+    return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
+
+
 def build_linkedin_search_urls(days_filter: str) -> list:
     time_filter = resolve_time_filter(days_filter)
     encoded_location = quote(SEARCH_LOCATION)
+    company_ids = get_target_company_ids()
 
-    urls = []
-    for keyword in SEARCH_KEYWORDS:
-        encoded_keyword = quote(keyword)
-        urls.append(
-            "https://www.linkedin.com/jobs/search/"
-            f"?keywords={encoded_keyword}&location={encoded_location}&f_TPR={time_filter}"
-        )
-    return urls
+    if not company_ids:
+        # Fallback to general search if no company IDs available
+        urls = []
+        for keyword in SEARCH_KEYWORDS:
+            encoded_keyword = quote(keyword)
+            urls.append(
+                "https://www.linkedin.com/jobs/search/"
+                f"?keywords={encoded_keyword}&location={encoded_location}&f_TPR={time_filter}"
+            )
+        return urls
+
+    # Tech query to filter roles in these companies
+    tech_query = quote('Java OR "Spring Boot" OR Microservices OR "Backend" OR "Full Stack"')
+    f_c_param = quote(",".join(company_ids))
+
+    return [
+        "https://www.linkedin.com/jobs/search/"
+        f"?f_C={f_c_param}&keywords={tech_query}&location={encoded_location}&f_TPR={time_filter}"
+    ]
 
 
 def ensure_worksheet_headers(worksheet, emit) -> None:
@@ -183,6 +204,8 @@ def run_job_scraper(
         existing_links = set()
         emit("log", f"Warning: Failed to retrieve existing links from sheet: {str(e)}")
 
+    target_companies = load_target_companies()
+    emit("log", f"Loaded {len(target_companies)} target companies from Companies.txt")
     emit("log", f"Loaded {len(existing_links)} existing job links for duplicate check")
 
     search_urls = build_linkedin_search_urls(days_filter)
@@ -262,6 +285,21 @@ def run_job_scraper(
                 )
                 continue
 
+            if target_companies and not is_target_company(company, target_companies):
+                jobs_skipped += 1
+                emit(
+                    "job_processed",
+                    f"Non-target company (skipped): {title} at {company}",
+                    title=title,
+                    company=company,
+                    score=None,
+                    company_type="Non-Target",
+                    action="Skipped (Non-Target)",
+                    link=link,
+                    index=index + 1,
+                )
+                continue
+
             emit("log", f"Scoring job {index + 1}/{total_jobs}: {title} at {company}")
             score_result = get_score(
                 description,
@@ -276,7 +314,7 @@ def run_job_scraper(
                 jobs_skipped += 1
                 emit(
                     "job_processed",
-                    f"Low Match Score ({score}, {company_type}): {title} at {company}",
+                    f"Low Match Score ({score}): {title} at {company}",
                     title=title,
                     company=company,
                     score=score,
@@ -316,7 +354,7 @@ def run_job_scraper(
             jobs_added += 1
             emit(
                 "job_processed",
-                f"Added: {title} at {company} (Score: {score}, Type: {company_type})",
+                f"Added: {title} at {company} (Score: {score})",
                 title=title,
                 company=company,
                 score=score,
