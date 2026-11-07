@@ -61,7 +61,7 @@ KNOWN_COMPANY_CLEANUPS = {
     "warner bros": "Warner Bros",
 }
 
-SHORT_ACRONYMS = {"ice", "msd", "tjx", "cibc", "adp", "ge"}
+SHORT_ACRONYMS = {"msd", "tjx", "cibc", "adp", "ge"}
 
 COMPANY_LINKEDIN_IDS = {
     "t-mobile": "1392",
@@ -100,7 +100,6 @@ COMPANY_LINKEDIN_IDS = {
     "de shaw": "2408262",
     "broadcom": "3072",
     "wise": "1769571",
-    "ice": "252398",
     "micron": "3690",
     "micron technology": "3690",
     "fanatics": "68543",
@@ -176,7 +175,7 @@ def is_target_company(company_name: str, target_companies: list[str]) -> bool:
         t_lower = target.strip().lower()
         t_norm = re.sub(r"[^a-z0-9]", "", t_lower)
 
-        # For short acronyms (e.g. ICE, MSD, TJX, CIBC, ADP, GE), require full word match
+        # For short acronyms (e.g. MSD, TJX, CIBC, ADP, GE), require full word match
         if t_lower in SHORT_ACRONYMS or len(t_norm) <= 3:
             if t_lower in inc_words or t_norm in inc_words:
                 return True

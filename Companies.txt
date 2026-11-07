@@ -34,7 +34,6 @@ Companies :
 31. DE shaw and co
 32. Broadcom
 33. Wise
-34. ICE
 35. Micron
 36. Fanatics
 37. Factset
