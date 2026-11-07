@@ -1,29 +1,18 @@
-7+ years Full Stack Developer
+CUMULATIVE EXPERIENCE:
+- Total Experience: 7+ years in Full Stack & Backend Software Engineering
+- Current Level: Senior Full Stack Developer / Senior Java Engineer
 
-Java
-Spring Boot
-Microservices
-React.js
-REST APIs
-SQL
-Kafka
-Redis
-AWS
-Docker
-CI/CD
+CUMULATIVE TECHNICAL SKILLS:
+- Core Languages: Java (Core & Advanced), Python, JavaScript (ES6+), SQL
+- Backend & Frameworks: Spring Boot, Spring Reactive, Microservices Architecture, RESTful APIs, FastAPI, Hibernate, Kafka, Redis
+- Frontend: React.js, Modern Web UI Architecture
+- AI & Agentic Systems: GenAI, Agentic AI, LangGraph, Deep Agents, RAG, Vector DBs, MCP Tools
+- Cloud, DevOps & Tools: AWS, Docker, CI/CD, Git, Maven, Jenkins, Postman
 
+COMPANIES WORKED:
+- Verizon (Full Stack Developer)
+- NTT DATA (Software Development Specialist)
+- Birlasoft (Associate Java Developer)
 
-Verizon - Full Stack Developer
-NTT DATA - Software Development Specialist
-Birlasoft - Associate Java Developer
-
-Target Roles:
-Senior Java Developer
-Full Stack Developer
-Software Engineer
-Java React Developer
-Spring Boot Developer
-
-
-
-
+TARGET ROLES:
+Senior Java Developer, Java Full Stack Developer, Java Backend Developer, Spring Boot Developer, Senior Backend Engineer, Java React Developer, Senior Software Engineer

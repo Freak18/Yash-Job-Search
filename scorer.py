@@ -67,11 +67,11 @@ RESUME MATCH — EXPERIENCE AND SKILLS REQUIREMENTS
 ==================================================
 
 Evaluate the required years of experience and skills:
-- The candidate's resume shows approximately 7 years of experience.
-- The required experience for the job MUST NOT be more than 8 years.
-- If the job description requires more than 8 years of experience (e.g. 9+, 10+, 12+ years, or Senior/Lead/Architect roles demanding >8 years), the match is poor and you MUST reduce the score drastically (it should not exceed 50).
-- If the job description requires 8 years of experience or less (e.g. 5-8 years, 3-5 years, or unspecified mid-senior level), it matches the candidate's experience.
-- Carefully evaluate core stack matching: verify if they require Java, Spring Boot, Microservices, and optionally React.
+- The candidate's resume shows 7+ years of professional full-stack development experience (Java, Spring Boot, React, Microservices, and GenAI).
+- The ideal required experience for the job is between 3 and 8 years.
+- If the job description requires more than 8 years of experience (e.g. 9+, 10+, 12+ years, or Principal/Staff/Architect roles demanding >8 years), the match is poor and you MUST reduce the score drastically (it should not exceed 50).
+- If the job description requires 8 years of experience or less (e.g. 4-7 years, 5-8 years, 3-5 years, or unspecified mid-to-senior level), it aligns well with the candidate's background.
+- Core stack priority: Java, Spring Boot, Microservices, and optionally React / GenAI.
 
 ==================================================
 RESUME MATCH — STRONG POSITIVE SIGNALS
@@ -79,50 +79,51 @@ RESUME MATCH — STRONG POSITIVE SIGNALS
 
 Give strong positive weight if the job description contains:
 
-- Java
-- Spring Boot
-- Microservices
-- React
-- AWS
-- Kafka
-- Redis
-- REST APIs
-- Full Stack Development
-- Backend Development using Java
-- Senior Java Development
+- Java (Core & Advanced)
+- Spring Boot / Spring Reactive
+- Microservices Architecture
+- React.js / Modern Frontend
+- RESTful APIs
+- Kafka / Event-driven architecture
+- Redis / Caching
+- AWS / Cloud Services
+- Docker / Containerization
+- GenAI / Agentic AI / LangGraph / RAG / LLM Integration
+- Full Stack Development (Java + React)
+- Backend Engineering using Java
+- Senior Software Engineer / Lead Java Developer
 
 ==================================================
 RESUME MATCH — NEGATIVE SIGNALS
 ==================================================
 
-Give strong negative weight if the job description is mainly:
+Give strong negative weight if the job description is primarily:
 
 - .NET, C#, ASP.NET
-- Power BI
-- QA, Testing
-- Data Engineer, Data Analyst
-- Python-only roles
-- DevOps-only roles
-- SAP, Salesforce, ServiceNow
-- Support Engineer, Network Engineer
+- Power BI, Tableau
+- QA, Manual Testing, Test Automation only
+- Data Analyst, BI Developer
+- DevOps-only / Sysadmin / SRE only (with no application development)
+- SAP, Salesforce, or ServiceNow administration / configuration
+- Support Engineer, Helpdesk, Network Engineer
 
 ==================================================
 RESUME MATCH SCORING GUIDE (score)
 ==================================================
 
-95-100: Excellent match — Java + Spring Boot + Microservices + React + REST APIs
-85-94:  Strong Java role — most important skills match
-70-84:  Good Java role — some important skills missing
-50-69:  Weak Java match
-30-49:  Poor match
-0-29:   Technology mismatch
+95-100: Exceptional match — Java + Spring Boot + Microservices + React / AWS / GenAI
+85-94:  Strong match — core Java + Spring Boot + Microservices match with required experience
+70-84:  Good match — solid Java backend role, minor complementary skills missing
+50-69:  Weak match — peripheral Java or secondary role fit
+30-49:  Poor match — wrong seniority or major tech stack gaps
+0-29:   Technology mismatch (.NET, QA, SAP, Salesforce, Support)
 
 Rules:
 - If Java is NOT a primary skill, score MUST be below 50.
-- If Spring Boot is missing, score should rarely exceed 80.
-- If React, AWS, Kafka, Redis and Microservices are present, increase score.
-- If the role is primarily .NET, C#, QA, Data Engineering, Python-only, DevOps-only,
-  SAP, Salesforce or ServiceNow administration, score should be below 30.
+- If Spring Boot is missing for a Java backend role, score should rarely exceed 80.
+- If React, AWS, Kafka, Redis, Docker, and Microservices are present, increase score.
+- If GenAI / Agentic AI / LLM workflows are requested alongside Java/Full Stack, boost score.
+- If the role is primarily .NET, C#, QA, SAP, Salesforce or ServiceNow administration, score should be below 30.
 - Crucial Experience Penalty: If the job description requires more than 8 years of experience (e.g. 9+ years, 10+ years, etc.), the score MUST be reduced drastically and MUST NOT exceed 50.
 
 ==================================================
