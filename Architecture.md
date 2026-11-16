@@ -45,6 +45,7 @@ Packages:
 * gspread
 * openai
 * python-dotenv
+* pypdf
 
 ---
 
@@ -65,8 +66,9 @@ Routes:
 
 ```text
 GET  /             Dashboard UI
-GET  /api/resume   Load resume text
-POST /api/resume   Save resume text
+GET  /api/resume          Load resume text
+POST /api/resume          Save resume text
+POST /api/resume/upload   Upload PDF -> extract text (pypdf) -> compact with AI -> returns text (not saved)
 GET  /api/run      Start scraper (SSE progress stream)
 ```
 
@@ -161,11 +163,27 @@ Columns:
 ```text
 Job Title
 Company
+Company Type
 Job Link
 Score
 Posted Date
 Date Added
 ```
+
+Worksheet `Companies` (target companies, editable from the dashboard, auto-created and seeded from `company_ids.json`):
+
+```text
+Company Name
+LinkedIn ID
+Type            # Product | Service | blank (AI detects)
+```
+
+Dashboard run options:
+
+* **Jobs From**: `Companies in Sheet` (search by LinkedIn ID, keep only listed companies) or `All Companies` (keyword search, no company filter).
+* **Company Type**: `All` or `Product-Based Only` (uses the sheet Type, else AI-detected type).
+
+Routes added: `GET/POST /api/companies`.
 
 ---
 
@@ -364,7 +382,8 @@ Runs the scraper without the web UI.
 ├── server.py             # Flask app
 ├── scorer.py             # OpenRouter scoring
 ├── sheets.py             # Google Sheets auth
-├── paths.py              # Resume path helper
+├── resume_parser.py      # PDF text extraction + AI compaction
+├── paths.py              # Resume path + company validation/matching
 ├── config.py             # Environment config
 ├── resume.txt
 ├── requirements.txt

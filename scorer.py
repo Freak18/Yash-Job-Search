@@ -11,8 +11,8 @@ from paths import read_resume
 
 logger = logging.getLogger(__name__)
 
-VALID_COMPANY_TYPES = frozenset({"Target", "Unknown"})
-DEFAULT_SCORE_RESULT = {"score": 0, "company_type": "Target", "reason": ""}
+VALID_COMPANY_TYPES = frozenset({"Product", "Service", "Unknown"})
+DEFAULT_SCORE_RESULT = {"score": 0, "company_type": "Unknown", "reason": ""}
 
 _client: Optional[OpenAI] = None
 MAX_RETRIES = 3
@@ -134,6 +134,7 @@ Return ONLY a raw JSON object with NO preamble, explanation, or markdown formatt
 
 {{
   "score": <integer 0-100>,
+  "company_type": "<Product if the company builds and sells its own software/product/platform, Service if it is an IT services/consulting/staffing/outsourcing firm, otherwise Unknown>",
   "reason": "<short 1-sentence summary of fit>"
 }}
 """.strip()
@@ -199,10 +200,13 @@ def _parse_score_response(raw_content: str) -> Dict[str, Union[int, str]]:
         final_score = 0
 
     reason = str(payload.get("reason", "")).strip()
+    company_type = str(payload.get("company_type", "")).strip().title()
+    if company_type not in VALID_COMPANY_TYPES:
+        company_type = "Unknown"
 
     return {
         "score": final_score,
-        "company_type": "Target",
+        "company_type": company_type,
         "reason": reason,
     }
 
@@ -212,7 +216,7 @@ def get_score(job_description: str, company_name: str = "", log_callback: Option
     Score a job against the candidate resume.
 
     Returns:
-        {"score": <int 0-100>, "company_type": "Target", "reason": "<str>"}
+        {"score": <int 0-100>, "company_type": "Product|Service|Unknown", "reason": "<str>"}
     """
     if not job_description or not job_description.strip():
         logger.warning("Empty job description provided for company: %s", company_name)

@@ -5,13 +5,9 @@ from urllib.parse import quote, urlparse
 from apify_client import ApifyClient
 
 from config import APIFY_TOKEN, SHEET_NAME
-from paths import (
-    get_target_company_ids,
-    is_target_company,
-    load_target_companies,
-)
+from paths import find_matching_company, get_target_company_ids
 from scorer import get_score
-from sheets import get_gspread_client
+from sheets import get_gspread_client, read_companies
 
 WORKSHEET_NAME = "Jobs"
 EXPECTED_HEADERS = [
@@ -26,6 +22,8 @@ EXPECTED_HEADERS = [
 JOB_LINK_COLUMN = 4
 DEFAULT_MIN_SCORE = 85
 DEFAULT_DAYS_FILTER = "3"
+DEFAULT_JOB_SOURCE = "sheet"
+DEFAULT_COMPANY_TYPE = "all"
 
 TIME_FILTERS = {
     "1": "r86400",      
@@ -98,29 +96,24 @@ def chunk_list(items: list, chunk_size: int = 7) -> list:
     return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
 
 
-def build_linkedin_search_urls(days_filter: str) -> list:
+def build_keyword_search_urls(days_filter: str) -> list:
     time_filter = resolve_time_filter(days_filter)
     encoded_location = quote(SEARCH_LOCATION)
-    company_ids = get_target_company_ids()
-
-    if not company_ids:
-        # Fallback to general search if no company IDs available
-        urls = []
-        for keyword in SEARCH_KEYWORDS:
-            encoded_keyword = quote(keyword)
-            urls.append(
-                "https://www.linkedin.com/jobs/search/"
-                f"?keywords={encoded_keyword}&location={encoded_location}&f_TPR={time_filter}"
-            )
-        return urls
-
-    # Tech query to filter roles in these companies
-    tech_query = quote('Java OR "Spring Boot" OR Microservices OR "Backend" OR "Full Stack"')
-    f_c_param = quote(",".join(company_ids))
-
     return [
         "https://www.linkedin.com/jobs/search/"
-        f"?f_C={f_c_param}&keywords={tech_query}&location={encoded_location}&f_TPR={time_filter}"
+        f"?keywords={quote(keyword)}&location={encoded_location}&f_TPR={time_filter}"
+        for keyword in SEARCH_KEYWORDS
+    ]
+
+
+def build_company_search_urls(company_ids: list, days_filter: str) -> list:
+    time_filter = resolve_time_filter(days_filter)
+    encoded_location = quote(SEARCH_LOCATION)
+    tech_query = quote('Java OR "Spring Boot" OR Microservices OR "Backend" OR "Full Stack"')
+    return [
+        "https://www.linkedin.com/jobs/search/"
+        f"?f_C={quote(','.join(chunk))}&keywords={tech_query}&location={encoded_location}&f_TPR={time_filter}"
+        for chunk in chunk_list(company_ids)
     ]
 
 
@@ -180,6 +173,8 @@ def run_job_scraper(
     count=10,
     min_score=DEFAULT_MIN_SCORE,
     days_filter=DEFAULT_DAYS_FILTER,
+    job_source=DEFAULT_JOB_SOURCE,
+    company_type=DEFAULT_COMPANY_TYPE,
     status_callback=None,
 ):
     def emit(event_type, message, **kwargs):
@@ -204,11 +199,50 @@ def run_job_scraper(
         existing_links = set()
         emit("log", f"Warning: Failed to retrieve existing links from sheet: {str(e)}")
 
-    target_companies = load_target_companies()
-    emit("log", f"Loaded {len(target_companies)} target companies from Companies.txt")
+    use_sheet_companies = job_source == "sheet"
+    product_only = company_type == "product"
+    emit(
+        "log",
+        f"Mode: {'jobs from Companies sheet' if use_sheet_companies else 'all companies'}"
+        f" | {'product-based only' if product_only else 'all company types'}",
+    )
+
+    target_companies = []
+    if use_sheet_companies:
+        try:
+            target_companies = read_companies(spreadsheet)
+        except Exception as e:
+            error_msg = f"Failed to read Companies sheet: {str(e)}"
+            emit("log", error_msg, status="error")
+            return {"error": error_msg}
+
+        if product_only:
+            target_companies = [c for c in target_companies if c["type"] != "Service"]
+
+        if not target_companies:
+            error_msg = "No companies available in the Companies sheet. Add companies or switch to 'All companies'."
+            emit("log", error_msg, status="error")
+            return {"error": error_msg}
+
+        company_ids = get_target_company_ids(target_companies)
+        missing_ids = [c["name"] for c in target_companies if not c["id"]]
+        emit("log", f"Loaded {len(target_companies)} companies from sheet ({len(company_ids)} with LinkedIn ID)")
+        if missing_ids:
+            emit(
+                "log",
+                f"No LinkedIn ID, not searchable: {', '.join(missing_ids)}",
+                status="warning",
+            )
+        if not company_ids:
+            error_msg = "None of the companies have a LinkedIn ID. Add IDs to search them."
+            emit("log", error_msg, status="error")
+            return {"error": error_msg}
+        search_urls = build_company_search_urls(company_ids, days_filter)
+    else:
+        search_urls = build_keyword_search_urls(days_filter)
+
     emit("log", f"Loaded {len(existing_links)} existing job links for duplicate check")
 
-    search_urls = build_linkedin_search_urls(days_filter)
     time_filter = resolve_time_filter(days_filter)
     emit(
         "log",
@@ -285,20 +319,23 @@ def run_job_scraper(
                 )
                 continue
 
-            if target_companies and not is_target_company(company, target_companies):
-                jobs_skipped += 1
-                emit(
-                    "job_processed",
-                    f"Non-target company (skipped): {title} at {company}",
-                    title=title,
-                    company=company,
-                    score=None,
-                    company_type="Non-Target",
-                    action="Skipped (Non-Target)",
-                    link=link,
-                    index=index + 1,
-                )
-                continue
+            matched_company = None
+            if use_sheet_companies:
+                matched_company = find_matching_company(company, target_companies)
+                if not matched_company:
+                    jobs_skipped += 1
+                    emit(
+                        "job_processed",
+                        f"Non-target company (skipped): {title} at {company}",
+                        title=title,
+                        company=company,
+                        score=None,
+                        company_type="Non-Target",
+                        action="Skipped (Non-Target)",
+                        link=link,
+                        index=index + 1,
+                    )
+                    continue
 
             emit("log", f"Scoring job {index + 1}/{total_jobs}: {title} at {company}")
             score_result = get_score(
@@ -307,8 +344,23 @@ def run_job_scraper(
                 log_callback=lambda msg, status="info": emit("log", msg, status=status)
             )
             score = score_result["score"]
-            company_type = score_result["company_type"]
+            detected_type = (matched_company or {}).get("type") or score_result["company_type"]
             time.sleep(1.5)
+
+            if product_only and detected_type != "Product":
+                jobs_skipped += 1
+                emit(
+                    "job_processed",
+                    f"Not a product company ({detected_type}): {title} at {company}",
+                    title=title,
+                    company=company,
+                    score=score,
+                    company_type=detected_type,
+                    action="Skipped (Not Product)",
+                    link=link,
+                    index=index + 1,
+                )
+                continue
 
             if score < min_score:
                 jobs_skipped += 1
@@ -318,7 +370,7 @@ def run_job_scraper(
                     title=title,
                     company=company,
                     score=score,
-                    company_type=company_type,
+                    company_type=detected_type,
                     action=f"Skipped (Score < {min_score})",
                     link=link,
                     index=index + 1,
@@ -333,7 +385,7 @@ def run_job_scraper(
                     title=title,
                     company=company,
                     score=score,
-                    company_type=company_type,
+                    company_type=detected_type,
                     action="Duplicate (Skipped)",
                     link=link,
                     index=index + 1,
@@ -343,7 +395,7 @@ def run_job_scraper(
             worksheet.append_row([
                 title,
                 company,
-                company_type,
+                detected_type,
                 link,
                 score,
                 posted_date,
@@ -358,7 +410,7 @@ def run_job_scraper(
                 title=title,
                 company=company,
                 score=score,
-                company_type=company_type,
+                company_type=detected_type,
                 action="Added to Sheet",
                 link=link,
                 index=index + 1,

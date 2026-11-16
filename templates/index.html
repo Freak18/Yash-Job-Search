@@ -517,6 +517,153 @@
             color: var(--text-color);
         }
 
+        /* Companies editor */
+        .company-add-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            min-width: 0;
+            background: rgba(20, 20, 22, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.6rem 0.75rem;
+            color: var(--text-color);
+            font-family: var(--font-sans);
+            font-size: 0.85rem;
+            transition: var(--transition);
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: rgba(201, 169, 110, 0.45);
+        }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            position: relative;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .info-icon {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--primary);
+            font-family: var(--font-serif);
+            font-size: 0.8rem;
+            font-weight: 700;
+            font-style: italic;
+            line-height: 1;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .info-icon:hover,
+        .info-icon:focus-visible {
+            border-color: rgba(201, 169, 110, 0.5);
+            outline: none;
+        }
+
+        .info-popover {
+            display: none;
+            position: absolute;
+            top: calc(100% + 0.4rem);
+            left: 0;
+            right: 0;
+            z-index: 10;
+            padding: 0.75rem;
+            background: #1c1c1f;
+            border: 1px solid rgba(201, 169, 110, 0.3);
+            border-radius: 6px;
+            box-shadow: var(--panel-shadow);
+            color: var(--text-color);
+            font-size: 0.78rem;
+            line-height: 1.5;
+        }
+
+        .info-popover.show {
+            display: block;
+        }
+
+        .info-popover code {
+            font-family: var(--font-mono);
+            color: var(--primary);
+        }
+
+        .company-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .company-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .company-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.6rem;
+            background: rgba(20, 20, 22, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.82rem;
+        }
+
+        .company-item .company-name {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .company-item .company-meta {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .company-item .company-meta.missing {
+            color: var(--warning);
+        }
+
+        .company-item .company-type-select {
+            width: auto;
+            padding: 0.2rem 1.5rem 0.2rem 0.4rem;
+            font-size: 0.72rem;
+            background-position: right 0.4rem center;
+        }
+
+        .company-remove {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            padding: 0 0.25rem;
+        }
+
+        .company-remove:hover {
+            color: var(--danger);
+        }
+
         /* Right Column layout */
         .results-container {
             display: flex;
@@ -1050,6 +1197,22 @@
                     </select>
                 </div>
 
+                <div class="form-group">
+                    <label for="job-source">Jobs From</label>
+                    <select id="job-source">
+                        <option value="sheet" selected>Companies in Sheet</option>
+                        <option value="all">All Companies</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="company-type">Company Type</label>
+                    <select id="company-type">
+                        <option value="all" selected>All Companies</option>
+                        <option value="product">Product-Based Only</option>
+                    </select>
+                </div>
+
                 <div class="form-group form-group-score">
                     <label for="min-score">Minimum Score Cutoff</label>
                     <div class="range-wrapper">
@@ -1091,8 +1254,36 @@
                     <svg class="resume-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </div>
                 <div id="resume-editor-container" class="resume-content">
+                    <input type="file" id="resume-pdf-input" accept="application/pdf,.pdf" hidden>
+                    <button type="button" id="upload-resume-btn" class="btn-secondary">📄 Upload PDF (AI will compact it)</button>
+                    <div class="company-hint">Extracted text fills the box below. Review it, then click Save Changes.</div>
                     <textarea id="resume-text" placeholder="Loading resume..."></textarea>
                     <button id="save-resume-btn" class="btn-secondary">Save Changes</button>
+                </div>
+            </div>
+
+            <!-- Target companies editor (stored in the Google Sheet "Companies" tab) -->
+            <div class="resume-section">
+                <div id="companies-toggle-btn" class="resume-toggle">
+                    <span>🏢 Target Companies (<span id="companies-count">0</span>)</span>
+                    <svg class="resume-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div id="companies-editor-container" class="resume-content">
+                    <div class="company-add-row">
+                        <input type="text" id="company-name-input" placeholder="Company name">
+                        <input type="text" id="company-id-input" placeholder="LinkedIn ID (optional)" inputmode="numeric">
+                    </div>
+                    <button id="add-company-btn" class="btn-secondary">Add Company</button>
+                    <div class="info-row">
+                        <button type="button" id="id-info-btn" class="info-icon" aria-label="How to find the LinkedIn ID" aria-expanded="false">i</button>
+                        <span>How to find the LinkedIn ID</span>
+                        <div id="id-info-popover" class="info-popover" role="note">
+                            <strong>Finding the ID:</strong> open the company's LinkedIn jobs page, filter by that company, and copy the number after <code>f_C=</code> in the URL.
+                        </div>
+                    </div>
+                    <div class="company-hint">Without an ID the company can't be searched. Type decides the "Product-Based Only" filter; leave on Auto to let AI detect.</div>
+                    <div id="company-list" class="company-list"></div>
+                    <button id="save-companies-btn" class="btn-secondary">Save Companies to Sheet</button>
                 </div>
             </div>
         </section>
@@ -1179,6 +1370,19 @@
         const resumeEditorContainer = document.getElementById('resume-editor-container');
         const resumeTextArea = document.getElementById('resume-text');
         const saveResumeBtn = document.getElementById('save-resume-btn');
+        const uploadResumeBtn = document.getElementById('upload-resume-btn');
+        const resumePdfInput = document.getElementById('resume-pdf-input');
+
+        const jobSourceSelect = document.getElementById('job-source');
+        const companyTypeSelect = document.getElementById('company-type');
+        const companiesToggleBtn = document.getElementById('companies-toggle-btn');
+        const companiesEditorContainer = document.getElementById('companies-editor-container');
+        const companiesCount = document.getElementById('companies-count');
+        const companyNameInput = document.getElementById('company-name-input');
+        const companyIdInput = document.getElementById('company-id-input');
+        const addCompanyBtn = document.getElementById('add-company-btn');
+        const companyListEl = document.getElementById('company-list');
+        const saveCompaniesBtn = document.getElementById('save-companies-btn');
 
         const statusMessage = document.getElementById('status-message');
         const statusPercent = document.getElementById('status-percent');
@@ -1252,6 +1456,181 @@
             }
         });
 
+        // Target companies editor
+        let companies = [];
+
+        companiesToggleBtn.addEventListener('click', () => {
+            companiesToggleBtn.classList.toggle('active');
+            companiesEditorContainer.classList.toggle('show');
+        });
+
+        const idInfoBtn = document.getElementById('id-info-btn');
+        const idInfoPopover = document.getElementById('id-info-popover');
+
+        function setIdInfo(open) {
+            idInfoPopover.classList.toggle('show', open);
+            idInfoBtn.setAttribute('aria-expanded', String(open));
+        }
+
+        idInfoBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setIdInfo(!idInfoPopover.classList.contains('show'));
+        });
+        document.addEventListener('click', (e) => {
+            if (!idInfoPopover.contains(e.target)) setIdInfo(false);
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') setIdInfo(false);
+        });
+
+        function renderCompanies() {
+            companiesCount.textContent = companies.length;
+            companyListEl.innerHTML = '';
+            companies.forEach((c, i) => {
+                const item = document.createElement('div');
+                item.className = 'company-item';
+
+                const name = document.createElement('span');
+                name.className = 'company-name';
+                name.textContent = c.name;
+                name.title = c.name;
+
+                const meta = document.createElement('span');
+                meta.className = 'company-meta' + (c.id ? '' : ' missing');
+                meta.textContent = c.id ? c.id : '⚠ no ID';
+
+                const typeSel = document.createElement('select');
+                typeSel.className = 'company-type-select';
+                [['', 'Auto'], ['Product', 'Product'], ['Service', 'Service']].forEach(([v, l]) => {
+                    const opt = document.createElement('option');
+                    opt.value = v;
+                    opt.textContent = l;
+                    if (c.type === v) opt.selected = true;
+                    typeSel.appendChild(opt);
+                });
+                typeSel.addEventListener('change', () => { companies[i].type = typeSel.value; });
+
+                const remove = document.createElement('button');
+                remove.className = 'company-remove';
+                remove.textContent = '×';
+                remove.setAttribute('aria-label', 'Remove ' + c.name);
+                remove.addEventListener('click', () => {
+                    companies.splice(i, 1);
+                    renderCompanies();
+                });
+
+                item.append(name, meta, typeSel, remove);
+                companyListEl.appendChild(item);
+            });
+        }
+
+        async function fetchCompanies() {
+            companyListEl.textContent = 'Loading companies...';
+            try {
+                const res = await fetch('/api/companies');
+                const data = await res.json();
+                if (data.success) {
+                    companies = data.companies;
+                    renderCompanies();
+                } else {
+                    companyListEl.textContent = 'Failed to load: ' + data.message;
+                }
+            } catch (err) {
+                companyListEl.textContent = 'Network error loading companies';
+            }
+        }
+
+        addCompanyBtn.addEventListener('click', () => {
+            const name = companyNameInput.value.trim();
+            const id = companyIdInput.value.trim();
+            if (!name) {
+                showToast('Enter a company name', 'error');
+                return;
+            }
+            if (id && !/^\d+$/.test(id)) {
+                showToast('LinkedIn ID must be numeric', 'error');
+                return;
+            }
+            if (companies.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                showToast('Company already in list', 'error');
+                return;
+            }
+            companies.push({ name, id, type: '' });
+            companyNameInput.value = '';
+            companyIdInput.value = '';
+            renderCompanies();
+        });
+
+        saveCompaniesBtn.addEventListener('click', async () => {
+            saveCompaniesBtn.disabled = true;
+            saveCompaniesBtn.textContent = 'Saving...';
+            try {
+                const res = await fetch('/api/companies', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ companies })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    companies = data.companies;
+                    renderCompanies();
+                    showToast('Companies saved to sheet!', 'success');
+                } else {
+                    showToast('Failed to save companies: ' + data.message, 'error');
+                }
+            } catch (err) {
+                showToast('Network error saving companies', 'error');
+            } finally {
+                saveCompaniesBtn.disabled = false;
+                saveCompaniesBtn.textContent = 'Save Companies to Sheet';
+            }
+        });
+
+        // Upload a PDF resume: server extracts text and compacts it with AI
+        uploadResumeBtn.addEventListener('click', () => resumePdfInput.click());
+
+        resumePdfInput.addEventListener('change', async () => {
+            const file = resumePdfInput.files[0];
+            resumePdfInput.value = '';
+            if (!file) return;
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                showToast('Please choose a PDF file', 'error');
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('PDF must be under 5 MB', 'error');
+                return;
+            }
+            if (resumeTextArea.value.trim() && !confirm('Replace the current resume text with the PDF content?')) {
+                return;
+            }
+
+            const originalLabel = uploadResumeBtn.textContent;
+            uploadResumeBtn.disabled = true;
+            uploadResumeBtn.textContent = 'Reading PDF & compacting with AI...';
+            try {
+                const form = new FormData();
+                form.append('file', file);
+                const res = await fetch('/api/resume/upload', { method: 'POST', body: form });
+                const data = await res.json();
+                if (data.success) {
+                    resumeTextArea.value = data.content;
+                    if (data.warning) {
+                        showToast(data.warning, 'error');
+                    } else {
+                        showToast('PDF processed. Review the text and click Save Changes.', 'success');
+                    }
+                } else {
+                    showToast('Upload failed: ' + data.message, 'error');
+                }
+            } catch (err) {
+                showToast('Network error uploading PDF', 'error');
+            } finally {
+                uploadResumeBtn.disabled = false;
+                uploadResumeBtn.textContent = originalLabel;
+            }
+        });
+
         // Appending logs to console
         function appendTerminalLine(text, styleClass = '') {
             const line = document.createElement('div');
@@ -1301,6 +1680,8 @@
             const jobCount = jobCountInput.value;
             const confidenceScore = minScoreSlider.value;
             const daysFilter = daysFilterSelect.value;
+            const jobSource = jobSourceSelect.value;
+            const companyType = companyTypeSelect.value;
 
             // UI Adjustments
             isScraping = true;
@@ -1317,7 +1698,7 @@
 
             // Establish Server-Sent Events source connection
             eventSource = new EventSource(
-                `/api/run?jobCount=${jobCount}&confidenceScore=${confidenceScore}&daysFilter=${daysFilter}`
+                `/api/run?jobCount=${jobCount}&confidenceScore=${confidenceScore}&daysFilter=${daysFilter}&jobSource=${jobSource}&companyType=${companyType}`
             );
 
             eventSource.onmessage = (event) => {
@@ -1425,6 +1806,7 @@
 
         // Initialize resume input fields
         fetchResume();
+        fetchCompanies();
     </script>
 </body>
 </html>
