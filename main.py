@@ -175,6 +175,7 @@ def run_job_scraper(
     days_filter=DEFAULT_DAYS_FILTER,
     job_source=DEFAULT_JOB_SOURCE,
     company_type=DEFAULT_COMPANY_TYPE,
+    selected_companies=None,
     status_callback=None,
 ):
     def emit(event_type, message, **kwargs):
@@ -215,6 +216,11 @@ def run_job_scraper(
             error_msg = f"Failed to read Companies sheet: {str(e)}"
             emit("log", error_msg, status="error")
             return {"error": error_msg}
+
+        if selected_companies is not None:
+            selected_set = {str(name).strip().lower() for name in selected_companies if str(name).strip()}
+            target_companies = [c for c in target_companies if c["name"].strip().lower() in selected_set]
+            emit("log", f"Filtered to {len(target_companies)} selected company(ies) for this run")
 
         if product_only:
             target_companies = [c for c in target_companies if c["type"] != "Service"]

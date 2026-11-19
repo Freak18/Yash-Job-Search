@@ -664,6 +664,39 @@
             color: var(--danger);
         }
 
+        .company-selection-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            padding: 0.15rem 0.1rem;
+        }
+
+        .company-select-actions {
+            display: flex;
+            gap: 0.65rem;
+        }
+
+        .company-link-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            font-size: 0.78rem;
+            padding: 0;
+        }
+
+        .company-link-btn:hover {
+            text-decoration: underline;
+        }
+
+        .company-checkbox {
+            accent-color: var(--primary);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
         /* Right Column layout */
         .results-container {
             display: flex;
@@ -1281,7 +1314,14 @@
                             <strong>Finding the ID:</strong> open the company's LinkedIn jobs page, filter by that company, and copy the number after <code>f_C=</code> in the URL.
                         </div>
                     </div>
-                    <div class="company-hint">Without an ID the company can't be searched. Type decides the "Product-Based Only" filter; leave on Auto to let AI detect.</div>
+                    <div class="company-hint">Without an ID the company can't be searched. Type decides the "Product-Based Only" filter; leave on Auto to let AI detect. Checkboxes only filter the next run and do not change your Google Sheet.</div>
+                    <div class="company-selection-bar">
+                        <span id="company-selected-summary">Selected for run: 0 / 0</span>
+                        <div class="company-select-actions">
+                            <button type="button" id="select-all-companies-btn" class="company-link-btn">Select All</button>
+                            <button type="button" id="clear-companies-btn" class="company-link-btn">Clear</button>
+                        </div>
+                    </div>
                     <div id="company-list" class="company-list"></div>
                     <button id="save-companies-btn" class="btn-secondary">Save Companies to Sheet</button>
                 </div>
@@ -1458,6 +1498,22 @@
 
         // Target companies editor
         let companies = [];
+        let selectedCompanies = new Set();
+        const companySelectedSummary = document.getElementById('company-selected-summary');
+        const selectAllCompaniesBtn = document.getElementById('select-all-companies-btn');
+        const clearCompaniesBtn = document.getElementById('clear-companies-btn');
+
+        function companyKey(name) {
+            return String(name || '').trim().toLowerCase();
+        }
+
+        function updateCompanySelectionSummary() {
+            const selectedCount = companies.filter(c => selectedCompanies.has(companyKey(c.name))).length;
+            companySelectedSummary.textContent = `Selected for run: ${selectedCount} / ${companies.length}`;
+            companiesCount.textContent = selectedCount < companies.length
+                ? `${selectedCount}/${companies.length}`
+                : String(companies.length);
+        }
 
         companiesToggleBtn.addEventListener('click', () => {
             companiesToggleBtn.classList.toggle('active');
@@ -1484,11 +1540,26 @@
         });
 
         function renderCompanies() {
-            companiesCount.textContent = companies.length;
+            updateCompanySelectionSummary();
             companyListEl.innerHTML = '';
             companies.forEach((c, i) => {
+                const key = companyKey(c.name);
                 const item = document.createElement('div');
                 item.className = 'company-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'company-checkbox';
+                checkbox.checked = selectedCompanies.has(key);
+                checkbox.setAttribute('aria-label', 'Include ' + c.name + ' in run');
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        selectedCompanies.add(key);
+                    } else {
+                        selectedCompanies.delete(key);
+                    }
+                    updateCompanySelectionSummary();
+                });
 
                 const name = document.createElement('span');
                 name.className = 'company-name';
@@ -1515,14 +1586,25 @@
                 remove.textContent = '×';
                 remove.setAttribute('aria-label', 'Remove ' + c.name);
                 remove.addEventListener('click', () => {
+                    selectedCompanies.delete(key);
                     companies.splice(i, 1);
                     renderCompanies();
                 });
 
-                item.append(name, meta, typeSel, remove);
+                item.append(checkbox, name, meta, typeSel, remove);
                 companyListEl.appendChild(item);
             });
         }
+
+        selectAllCompaniesBtn.addEventListener('click', () => {
+            selectedCompanies = new Set(companies.map(c => companyKey(c.name)));
+            renderCompanies();
+        });
+
+        clearCompaniesBtn.addEventListener('click', () => {
+            selectedCompanies.clear();
+            renderCompanies();
+        });
 
         async function fetchCompanies() {
             companyListEl.textContent = 'Loading companies...';
@@ -1531,6 +1613,7 @@
                 const data = await res.json();
                 if (data.success) {
                     companies = data.companies;
+                    selectedCompanies = new Set(companies.map(c => companyKey(c.name)));
                     renderCompanies();
                 } else {
                     companyListEl.textContent = 'Failed to load: ' + data.message;
@@ -1556,6 +1639,7 @@
                 return;
             }
             companies.push({ name, id, type: '' });
+            selectedCompanies.add(companyKey(name));
             companyNameInput.value = '';
             companyIdInput.value = '';
             renderCompanies();
@@ -1683,6 +1767,20 @@
             const jobSource = jobSourceSelect.value;
             const companyType = companyTypeSelect.value;
 
+            let selectedParam = '';
+            if (jobSource === 'sheet' && companies.length > 0) {
+                const selectedNames = companies
+                    .filter(c => selectedCompanies.has(companyKey(c.name)))
+                    .map(c => c.name);
+                if (selectedNames.length === 0) {
+                    showToast('Select at least one company to run, or switch Jobs From to All Companies.', 'error');
+                    return;
+                }
+                if (selectedNames.length < companies.length) {
+                    selectedParam = `&selectedCompanies=${encodeURIComponent(JSON.stringify(selectedNames))}`;
+                }
+            }
+
             // UI Adjustments
             isScraping = true;
             startBtnLabel.textContent = 'Stop Scraper';
@@ -1698,7 +1796,7 @@
 
             // Establish Server-Sent Events source connection
             eventSource = new EventSource(
-                `/api/run?jobCount=${jobCount}&confidenceScore=${confidenceScore}&daysFilter=${daysFilter}&jobSource=${jobSource}&companyType=${companyType}`
+                `/api/run?jobCount=${jobCount}&confidenceScore=${confidenceScore}&daysFilter=${daysFilter}&jobSource=${jobSource}&companyType=${companyType}${selectedParam}`
             );
 
             eventSource.onmessage = (event) => {

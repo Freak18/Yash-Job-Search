@@ -95,6 +95,16 @@ def run_scraper():
     if company_type not in ("product", "all"):
         company_type = "all"
 
+    selected_companies = None
+    raw_selected = request.args.get("selectedCompanies")
+    if raw_selected is not None:
+        try:
+            parsed = json.loads(raw_selected)
+            if isinstance(parsed, list):
+                selected_companies = [str(x) for x in parsed]
+        except ValueError:
+            selected_companies = None
+
     def generate():
         q = queue.Queue()
 
@@ -109,6 +119,7 @@ def run_scraper():
                     days_filter=str(days_filter),
                     job_source=job_source,
                     company_type=company_type,
+                    selected_companies=selected_companies,
                     status_callback=callback,
                 )
             except Exception as e:
