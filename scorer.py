@@ -67,10 +67,11 @@ RESUME MATCH — EXPERIENCE AND SKILLS REQUIREMENTS
 ==================================================
 
 Evaluate the required years of experience and skills:
-- The candidate's resume shows 7+ years of professional full-stack development experience (Java, Spring Boot, React, Microservices, and GenAI).
-- The ideal required experience for the job is between 3 and 8 years.
-- If the job description requires more than 8 years of experience (e.g. 9+, 10+, 12+ years, or Principal/Staff/Architect roles demanding >8 years), the match is poor and you MUST reduce the score drastically (it should not exceed 50).
-- If the job description requires 8 years of experience or less (e.g. 4-7 years, 5-8 years, 3-5 years, or unspecified mid-to-senior level), it aligns well with the candidate's background.
+- The candidate's resume shows 7-8 years of professional full-stack development experience (Java, Spring Boot, React, Microservices, and GenAI).
+- The ideal required experience for the job is between 4 and 8 years (e.g. 4+, 5+, 4-7, 5-8, 6-8 years, or unspecified senior/mid-to-senior level).
+- Too Junior Penalty: If the job description targets junior/entry-level candidates or specifies a minimum experience below 4 years (e.g. 0-2, 1-3, 2+, 2-4, 3+, Fresher, Intern, Junior, Associate/SDE-1), the candidate is overqualified and the match is poor — you MUST reduce the score drastically (it MUST NOT exceed 50).
+- Too Senior Penalty: If the job description requires more than 8 years of experience (e.g. 9+, 10+, 12+ years, or Principal/Staff/Architect roles demanding >8 years), the match is poor and you MUST reduce the score drastically (it MUST NOT exceed 50).
+- If the job description requires between 4 and 8 years (or does not specify years and clearly reads as a Senior / Lead / mid-to-senior role), it aligns well with the candidate's background.
 - Core stack priority: Java, Spring Boot, Microservices, and optionally React / GenAI.
 
 ==================================================
@@ -124,7 +125,9 @@ Rules:
 - If React, AWS, Kafka, Redis, Docker, and Microservices are present, increase score.
 - If GenAI / Agentic AI / LLM workflows are requested alongside Java/Full Stack, boost score.
 - If the role is primarily .NET, C#, QA, SAP, Salesforce or ServiceNow administration, score should be below 30.
-- Crucial Experience Penalty: If the job description requires more than 8 years of experience (e.g. 9+ years, 10+ years, etc.), the score MUST be reduced drastically and MUST NOT exceed 50.
+- Crucial Experience Penalty (Both Bounds):
+  - If the job description requires LESS than 4 years of minimum experience (e.g. 0-2, 1-3, 2+, 2-4, 3+ years, or Junior/Entry-level/SDE-1/Fresher roles), the score MUST be reduced drastically and MUST NOT exceed 50.
+  - If the job description requires MORE than 8 years of experience (e.g. 9+, 10+, 12+ years), the score MUST be reduced drastically and MUST NOT exceed 50.
 
 ==================================================
 OUTPUT FORMAT
