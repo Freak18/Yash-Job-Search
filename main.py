@@ -1,6 +1,7 @@
+import re
 import time
 from datetime import datetime
-from urllib.parse import quote, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 from apify_client import ApifyClient
 
@@ -51,6 +52,9 @@ SEARCH_KEYWORDS = [
 SEARCH_LOCATION = "Hyderabad"
 
 
+LINKEDIN_JOB_ID_RE = re.compile(r"/jobs/view/(?:[^/]*-)?(\d+)(?:/|$)")
+
+
 def normalize_job_link(link: str) -> str:
     link = (link or "").strip()
     if not link:
@@ -65,6 +69,15 @@ def normalize_job_link(link: str) -> str:
         netloc = netloc[4:]
 
     path = parsed.path.rstrip("/")
+
+    if netloc == "linkedin.com" or netloc.endswith(".linkedin.com"):
+        match = LINKEDIN_JOB_ID_RE.search(path)
+        if match:
+            return f"linkedin:{match.group(1)}"
+        current_ids = parse_qs(parsed.query).get("currentJobId")
+        if current_ids and current_ids[0].isdigit():
+            return f"linkedin:{current_ids[0]}"
+
     return f"{parsed.scheme.lower()}://{netloc}{path}"
 
 
